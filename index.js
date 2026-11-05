@@ -720,8 +720,10 @@ export function apply(ctx, config) {
     if (!editor || typeof editor.edit !== 'function' || typeof editor.entries !== 'function') {
       throw new Error('configEditor service unavailable in this deployment');
     }
-    const entry = editor.entries().find((e) => e && (e.name === 'dsh-ganleme' || e.id === 'ganleme'));
-    if (!entry) throw new Error('plugin entry not found in the config editor');
+    // entries() yields Loader entries; the profile row id lives at options.id.
+    const all = editor.entries();
+    const entry = all.find((e) => e && (e.options?.id === 'ganleme' || e.options?.name === 'dsh-ganleme'));
+    if (!entry) throw new Error(`plugin entry not found in the config editor (entries: ${all.map((e) => e.options?.id ?? '?').join(', ') || 'none'})`);
     await editor.edit(entry, (current, inherited) => {
       const raw = Array.isArray(current.extraRoots)
         ? current.extraRoots
