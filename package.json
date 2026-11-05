@@ -36,7 +36,7 @@
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-locale"]
+      "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-api-remotes"]
     }
   },
   "dependencies": {

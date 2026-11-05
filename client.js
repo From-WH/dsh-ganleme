@@ -108,6 +108,16 @@ window.__ModuleLoader__.load({
       'update.failed': '更新失败：{message}',
       'update.timeout': '更新超时，请稍后手动刷新页面',
       'update.available': '新版本 v{version} 可用，点击更新',
+      'projects.label': '项目源',
+      'projects.title': '项目源',
+      'projects.add': '从目录添加',
+      'projects.hint': '选择包含 git 仓库的文件夹；文件夹本身或其子目录中的仓库会自动纳入统计。',
+      'projects.empty': '还没有添加项目目录',
+      'projects.remove': '移除',
+      'projects.removed': '已移除',
+      'projects.added': '已添加：{path}',
+      'projects.exists': '该目录已在列表中',
+      'projects.addFailed': '操作失败：{message}',
     };
 
     /** English dictionary. */
@@ -199,6 +209,16 @@ window.__ModuleLoader__.load({
       'update.failed': 'Update failed: {message}',
       'update.timeout': 'Update timed out; refresh the page manually later',
       'update.available': 'New version v{version} available — click to update',
+      'projects.label': 'Projects',
+      'projects.title': 'Project sources',
+      'projects.add': 'Add directory',
+      'projects.hint': 'Pick a folder containing git repos; the folder itself and repos inside are included in stats.',
+      'projects.empty': 'No project directories added yet',
+      'projects.remove': 'Remove',
+      'projects.removed': 'Removed',
+      'projects.added': 'Added: {path}',
+      'projects.exists': 'Already in the list',
+      'projects.addFailed': 'Failed: {message}',
     };
 
     // ------------------------------------------------------------------
@@ -510,6 +530,8 @@ window.__ModuleLoader__.load({
 .gl-iconBtn:disabled{opacity:.6;cursor:default}
 .gl-iconBtn[data-alert="true"]{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}
 .gl-iconBtn[data-alert="true"]::after{content:'';position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-warn-primary);border:1.5px solid var(--dsw-alias-bg-base);animation:gl-pulse 1.2s ease-in-out infinite}
+.gl-rootRow{display:flex;align-items:center;gap:8px;padding:6px 0;font-size:12px}
+.gl-rootPath{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--dsw-alias-label-secondary);direction:ltr;text-align:left}
 /* Built-in skins: token overrides scoped to the plugin page subtree only.
    The default skin sets nothing and follows the host light/dark theme. */
 .gl-page[data-skin="warm"]{--dsw-alias-bg-base:#f6ead9;--dsw-alias-bg-layer-1:#fffdf8;--dsw-alias-bg-layer-2:#f8ecd9;--dsw-alias-bg-overlay:#fffdf8;--dsw-alias-border-l1:#ecdcc6;--dsw-alias-border-l2:#dfc9a9;--dsw-alias-brand-primary:#c96f22;--dsw-alias-label-primary:#443528;--dsw-alias-label-secondary:#8d7a63;--dsw-alias-interactive-bg-hover:#f7e8d2}
@@ -1203,8 +1225,65 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /** Folder-with-plus glyph for adding extra project sources. */
+    function FolderPlusIcon() {
+      return h(
+        'svg',
+        { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+        h('path', { d: 'M3.5 7A1.5 1.5 0 0 1 5 5.5H9.2L11.2 7.5H19A1.5 1.5 0 0 1 20.5 9V17A1.5 1.5 0 0 1 19 18.5H5A1.5 1.5 0 0 1 3.5 17V7Z', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linejoin': 'round' }),
+        h('path', { d: 'M12 10.5V14.5M10 12.5H14', stroke: 'currentColor', 'stroke-width': 2, 'stroke-linecap': 'round' }),
+      );
+    }
+
+    /** Project-sources popover: pick directories and manage the extra roots. */
+    function ProjectsModal({ roots, busy, message, onAdd, onRemove, onClose, t }) {
+      return h(
+        'div',
+        {
+          className: 'gl-backdrop',
+          onMouseDown: (e) => {
+            if (e.target === e.currentTarget) onClose();
+          },
+        },
+        h(
+          'div',
+          { className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('projects.title') },
+          h(
+            'div',
+            { className: 'gl-modalHead' },
+            h('h2', { className: 'gl-modalTitle' }, t('projects.title')),
+            h('span', { style: { marginLeft: 'auto' } }),
+            h('button', { className: 'gl-btn', onClick: onClose }, t('report.close')),
+          ),
+          h(
+            'div',
+            { style: { padding: '16px 18px 18px', overflowY: 'auto' } },
+            h('div', { className: 'gl-skinRow' }, h('button', { className: 'gl-btn', disabled: busy, onClick: onAdd }, t('projects.add'))),
+            h('div', { className: 'gl-skinStatus' }, t('projects.hint')),
+            roots !== null
+              ? roots.length > 0
+                ? h(
+                    'div',
+                    { style: { marginTop: '10px' } },
+                    roots.map((root) =>
+                      h(
+                        'div',
+                        { className: 'gl-rootRow', key: root },
+                        h('span', { className: 'gl-rootPath', title: root }, root),
+                        h('button', { className: 'gl-btn', disabled: busy, onClick: () => onRemove(root) }, t('projects.remove')),
+                      ),
+                    ),
+                  )
+                : h('div', { className: 'gl-skinStatus', style: { marginTop: '10px' } }, t('projects.empty'))
+              : null,
+            message ? h('div', { className: 'gl-skinStatus', style: { marginTop: '8px' } }, message) : null,
+          ),
+        ),
+      );
+    }
+
     /** The full-page dashboard bound to the `ganleme` main-panel key. */
-    function DashboardPage({ t }) {
+    function DashboardPage({ t, pickDirectory, canPick, addRoot, removeRoot, loadRoots }) {
       const [range, setRange] = React.useState('today');
       const [scope, setScope] = React.useState('all');
       const [reportScope, setReportScope] = React.useState('mine');
@@ -1217,6 +1296,10 @@ window.__ModuleLoader__.load({
       const [poolCount, setPoolCount] = React.useState(0);
       const [importState, setImportState] = React.useState(null);
       const [skinMsg, setSkinMsg] = React.useState('');
+      const [rootsOpen, setRootsOpen] = React.useState(false);
+      const [roots, setRoots] = React.useState(null);
+      const [rootsBusy, setRootsBusy] = React.useState(false);
+      const [rootsMsg, setRootsMsg] = React.useState('');
       const [payload, setPayload] = React.useState(null);
       const [phase, setPhase] = React.useState('loading');
       const [todayStats, setTodayStats] = React.useState(null);
@@ -1421,6 +1504,53 @@ window.__ModuleLoader__.load({
         poolRef.current = [];
         setPoolCount(0);
         bgDbClear().catch(() => {});
+      };
+
+      React.useEffect(() => {
+        if (!rootsOpen) return;
+        const onKey = (e) => {
+          if (e.key === 'Escape') setRootsOpen(false);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+      }, [rootsOpen]);
+
+      const openRoots = () => {
+        setRootsOpen(true);
+        setRootsMsg('');
+        loadRoots().then((list) => setRoots(Array.isArray(list) ? list : []));
+      };
+
+      const addRootFromPicker = async () => {
+        if (rootsBusy) return;
+        const path = await pickDirectory();
+        if (!path) return;
+        setRootsBusy(true);
+        try {
+          const result = await addRoot(path);
+          setRoots(Array.isArray(result.roots) ? result.roots : []);
+          setRootsMsg(result.added === false ? t('projects.exists') : fmt(t('projects.added'), { path: result.path }));
+          refresh();
+        } catch (error) {
+          setRootsMsg(fmt(t('projects.addFailed'), { message: String(error?.message ?? error) }));
+        } finally {
+          setRootsBusy(false);
+        }
+      };
+
+      const removeRootByPath = async (path) => {
+        if (rootsBusy) return;
+        setRootsBusy(true);
+        try {
+          const result = await removeRoot(path);
+          setRoots(Array.isArray(result.roots) ? result.roots : []);
+          setRootsMsg(t('projects.removed'));
+          refresh();
+        } catch (error) {
+          setRootsMsg(fmt(t('projects.addFailed'), { message: String(error?.message ?? error) }));
+        } finally {
+          setRootsBusy(false);
+        }
       };
 
       // The quip always speaks about today, whichever range the dashboard shows.
@@ -1629,6 +1759,9 @@ window.__ModuleLoader__.load({
                   )
                 : null,
               h('button', { className: 'gl-iconBtn', 'aria-label': t('refresh'), title: t('refresh'), onClick: refresh }, h(RefreshIcon)),
+              canPick
+                ? h('button', { className: 'gl-iconBtn', 'aria-label': t('projects.label'), title: t('projects.label'), onClick: openRoots }, h(FolderPlusIcon))
+                : null,
               h('button', { className: 'gl-iconBtn', 'aria-label': t('skin.label'), title: t('skin.label'), onClick: () => setSkinOpen(true) }, h(PaletteIcon)),
             ),
           ),
@@ -1778,6 +1911,17 @@ window.__ModuleLoader__.load({
                 t,
               })
             : null,
+          rootsOpen
+            ? h(ProjectsModal, {
+                roots,
+                busy: rootsBusy,
+                message: rootsMsg,
+                onAdd: addRootFromPicker,
+                onRemove: removeRootByPath,
+                onClose: () => setRootsOpen(false),
+                t,
+              })
+            : null,
         ),
       );
     }
@@ -1807,8 +1951,49 @@ window.__ModuleLoader__.load({
             PanelIcon,
           ),
         );
+        /** Browser → Host face: the native directory picker and project-source routes. */
+        const face = {
+          get canPick() {
+            return typeof ctx.remote?.directoryPicker?.pick === 'function';
+          },
+          async pickDirectory() {
+            try {
+              return (await ctx.remote?.directoryPicker?.pick()) ?? null;
+            } catch {
+              return null;
+            }
+          },
+          async addRoot(path) {
+            const res = await fetch('ganleme/roots/add', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ path }),
+            });
+            const body = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`);
+            return body;
+          },
+          async removeRoot(path) {
+            const res = await fetch('ganleme/roots/remove', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify({ path }),
+            });
+            const body = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`);
+            return body;
+          },
+          async loadRoots() {
+            try {
+              return (await fetchJson('ganleme/roots')).roots ?? [];
+            } catch {
+              return [];
+            }
+          },
+        };
+
         ctx.slots.inject('main', () =>
-          ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS }, DashboardPage),
+          ctx.slots.register({ name: 'main', key: PANEL_ID, locale: NS, inject: () => face }, DashboardPage),
         );
       },
     };

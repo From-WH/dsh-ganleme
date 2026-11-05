@@ -30,10 +30,12 @@ export const name = 'ganleme';
 export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess'];
 
 export const Config = z.object({
-  /** Additional directories scanned one level deep for git repositories. */
+  /** Additional directories scanned for git repositories (see scanDepth). */
   extraRoots: z.array(z.string()).default([]),
   /** Directory paths excluded from statistics (exact path or prefix). */
   excludedPaths: z.array(z.string()).default([]),
+  /** How many directory levels below a root to search for git repositories. */
+  scanDepth: z.number().min(1).max(3).default(1),
   /** Maximum commits read per repository per query. */
   commitLimit: z.number().default(5000),
   /** How long statistics stay cached before git runs again (ms). */
@@ -227,8 +229,9 @@ async function expandHome(path) {
 
 /**
  * Collect repositories: Harness workspaces first, then configured extra roots.
- * A directory that is itself a repository counts once; otherwise its direct
- * subdirectories are scanned (no deeper).
+ * A directory that is itself a repository counts once (and is not descended
+ * into); otherwise subdirectories are searched down to `config.scanDepth`
+ * levels, skipping hidden entries and bounding total directories visited.
  */
 export async function listRepos(ctx, config) {
   const excluded = (config.excludedPaths ?? []).map((p) => p.replace(/[\\/]+$/, ''));
@@ -236,14 +239,19 @@ export async function listRepos(ctx, config) {
     excluded.some((x) => path === x || path.startsWith(x + sep) || path.startsWith(x + '/'));
   const repos = [];
   const seen = new Set();
+  const state = { visited: 0, cap: 1500 };
+  const depth = Math.min(3, Math.max(1, Math.round(Number(config.scanDepth) || 1)));
 
-  const push = (path, title, source) => {
-    if (!path || seen.has(path) || isExcluded(path)) return;
-    seen.add(path);
-    repos.push({ key: Buffer.from(path, 'utf8').toString('base64url'), path, title, source });
+  const push = async (path, title, source) => {
+    const canon = await realpath(path).catch(() => path);
+    if (!canon || seen.has(canon) || isExcluded(canon)) return;
+    seen.add(canon);
+    repos.push({ key: Buffer.from(canon, 'utf8').toString('base64url'), path: canon, title, source });
   };
 
-  const scanChildren = async (dir, source) => {
+  /** Level-limited recursive search below `dir`; found repos are boundaries. */
+  const scanFrom = async (dir, levels, source) => {
+    if (levels <= 0 || state.visited >= state.cap) return;
     let entries = [];
     try {
       entries = await readdir(dir, { withFileTypes: true });
@@ -251,10 +259,15 @@ export async function listRepos(ctx, config) {
       return;
     }
     for (const entry of entries) {
+      if (state.visited >= state.cap) return;
       if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      state.visited += 1;
       const sub = join(dir, entry.name);
-      if (!(await isGitRepo(sub))) continue;
-      push(await realpath(sub).catch(() => sub), entry.name, source);
+      if (await isGitRepo(sub)) {
+        await push(sub, entry.name, source);
+      } else if (levels > 1) {
+        await scanFrom(sub, levels - 1, source);
+      }
     }
   };
 
@@ -268,8 +281,8 @@ export async function listRepos(ctx, config) {
     const raw = workspace?.path;
     if (!raw || !isAbsolute(raw) || !(await dirExists(raw))) continue;
     const canon = await realpath(raw).catch(() => raw);
-    if (await isGitRepo(canon)) push(canon, workspace.title || basename(canon), 'workspace');
-    else await scanChildren(canon, 'workspace');
+    if (await isGitRepo(canon)) await push(canon, workspace.title || basename(canon), 'workspace');
+    else await scanFrom(canon, depth, 'workspace');
   }
 
   for (const root of config.extraRoots ?? []) {
@@ -277,10 +290,10 @@ export async function listRepos(ctx, config) {
     if (!isAbsolute(expanded) || !(await dirExists(expanded))) continue;
     const canon = await realpath(expanded).catch(() => expanded);
     if (await isGitRepo(canon)) {
-      push(canon, basename(canon), 'extra');
+      await push(canon, basename(canon), 'extra');
       continue;
     }
-    await scanChildren(canon, 'extra');
+    await scanFrom(canon, depth, 'extra');
   }
 
   return repos;
@@ -673,5 +686,131 @@ export function apply(ctx, config) {
         },
       }),
     'ganleme: POST /ganleme/update/install',
+  );
+
+  // --- extra project roots: list / add / remove, persisted via configEditor ---
+  // Directory picks land in the plugin row's `extraRoots` through the normal
+  // Loader path, so they survive restarts and hot-reload into the statistics.
+
+  const readBoundedBody = async (req, cap = 64 * 1024) => {
+    const chunks = [];
+    let size = 0;
+    for await (const chunk of req) {
+      size += chunk.byteLength;
+      if (size > cap) {
+        req.resume();
+        return null;
+      }
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks, size).toString('utf8');
+  };
+
+  const parseJsonBody = (text) => {
+    try {
+      const body = JSON.parse(text);
+      return typeof body === 'object' && body !== null ? body : null;
+    } catch {
+      return null;
+    }
+  };
+
+  const updateExtraRoots = async (mutate) => {
+    const editor = ctx.configEditor;
+    if (!editor || typeof editor.edit !== 'function' || typeof editor.entries !== 'function') {
+      throw new Error('configEditor service unavailable in this deployment');
+    }
+    const entry = editor.entries().find((e) => e && (e.name === 'dsh-ganleme' || e.id === 'ganleme'));
+    if (!entry) throw new Error('plugin entry not found in the config editor');
+    await editor.edit(entry, (current, inherited) => {
+      const raw = Array.isArray(current.extraRoots)
+        ? current.extraRoots
+        : Array.isArray(inherited && inherited.extraRoots)
+          ? inherited.extraRoots
+          : (config.extraRoots ?? []);
+      return { ...current, extraRoots: mutate(raw.map(String)) };
+    });
+  };
+
+  const handleRootsMutation = async (req, res, mode) => {
+    if (rejected(req, res)) return;
+    if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
+    let body = null;
+    try {
+      const text = await readBoundedBody(req);
+      body = text === null ? null : parseJsonBody(text);
+    } catch {
+      body = null;
+    }
+    const rawPath = typeof body?.path === 'string' ? body.path.trim() : '';
+    if (!rawPath) {
+      sendJson(res, 400, { code: 'bad-request', message: 'path is required' });
+      return;
+    }
+    const expanded = rawPath === '~' ? homedir() : rawPath.startsWith('~/') ? join(homedir(), rawPath.slice(2)) : rawPath;
+    if (!isAbsolute(expanded) || !(await dirExists(expanded))) {
+      sendJson(res, 400, { code: 'bad-path', message: `directory does not exist: ${expanded}` });
+      return;
+    }
+    const canon = await realpath(expanded).catch(() => expanded);
+    try {
+      let before = 0;
+      let nextRoots = null;
+      // Idempotent on the write chain: the running config may lag behind the
+      // persisted override until HMR recomposes, so `added`/`removed` are
+      // measured against the authoritative pre-change list.
+      await updateExtraRoots((list) => {
+        before = list.length;
+        nextRoots =
+          mode === 'add'
+            ? list.includes(canon)
+              ? list
+              : [...list, canon]
+            : list.filter((p) => p !== canon && p !== rawPath);
+        return nextRoots;
+      });
+      sendJson(res, 200, {
+        roots: nextRoots ?? [],
+        added: mode === 'add' && nextRoots !== null && nextRoots.length !== before,
+        removed: mode === 'remove' && nextRoots !== null && nextRoots.length !== before,
+        path: canon,
+      });
+    } catch (error) {
+      sendJson(res, 501, { code: 'persist-failed', message: String(error?.message ?? error) });
+    }
+  };
+
+  ctx.effect(
+    () =>
+      ctx.webServer.register({
+        kind: 'exact',
+        path: '/ganleme/roots',
+        handler: async (req, res) => {
+          if (rejected(req, res)) return;
+          if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
+          sendJson(res, 200, { roots: config.extraRoots ?? [] });
+        },
+      }),
+    'ganleme: GET /ganleme/roots',
+  );
+
+  ctx.effect(
+    () =>
+      ctx.webServer.register({
+        kind: 'exact',
+        path: '/ganleme/roots/add',
+        handler: (req, res) => handleRootsMutation(req, res, 'add'),
+      }),
+    'ganleme: POST /ganleme/roots/add',
+  );
+
+  ctx.effect(
+    () =>
+      ctx.webServer.register({
+        kind: 'exact',
+        path: '/ganleme/roots/remove',
+        handler: (req, res) => handleRootsMutation(req, res, 'remove'),
+      }),
+    'ganleme: POST /ganleme/roots/remove',
   );
 }
