@@ -107,6 +107,7 @@ window.__ModuleLoader__.load({
       'update.done': '已更新到 v{version}，即将刷新…',
       'update.failed': '更新失败：{message}',
       'update.timeout': '更新超时，请稍后手动刷新页面',
+      'update.available': '新版本 v{version} 可用，点击更新',
     };
 
     /** English dictionary. */
@@ -197,6 +198,7 @@ window.__ModuleLoader__.load({
       'update.done': 'Updated to v{version}; refreshing…',
       'update.failed': 'Update failed: {message}',
       'update.timeout': 'Update timed out; refresh the page manually later',
+      'update.available': 'New version v{version} available — click to update',
     };
 
     // ------------------------------------------------------------------
@@ -503,6 +505,11 @@ window.__ModuleLoader__.load({
 .gl-updateBtn{color:var(--dsw-alias-brand-primary);display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0}
 .gl-updateBtn:disabled{opacity:.6;cursor:default}
 .gl-updateStatus{font-size:12px;color:var(--dsw-alias-label-secondary);max-width:280px;word-break:break-all}
+.gl-iconBtn{position:relative;display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;padding:0;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);cursor:pointer}
+.gl-iconBtn:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.gl-iconBtn:disabled{opacity:.6;cursor:default}
+.gl-iconBtn[data-alert="true"]{color:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary)}
+.gl-iconBtn[data-alert="true"]::after{content:'';position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-state-warn-primary);border:1.5px solid var(--dsw-alias-bg-base);animation:gl-pulse 1.2s ease-in-out infinite}
 /* Built-in skins: token overrides scoped to the plugin page subtree only.
    The default skin sets nothing and follows the host light/dark theme. */
 .gl-page[data-skin="warm"]{--dsw-alias-bg-base:#f6ead9;--dsw-alias-bg-layer-1:#fffdf8;--dsw-alias-bg-layer-2:#f8ecd9;--dsw-alias-bg-overlay:#fffdf8;--dsw-alias-border-l1:#ecdcc6;--dsw-alias-border-l2:#dfc9a9;--dsw-alias-brand-primary:#c96f22;--dsw-alias-label-primary:#443528;--dsw-alias-label-secondary:#8d7a63;--dsw-alias-interactive-bg-hover:#f7e8d2}
@@ -1161,7 +1168,7 @@ window.__ModuleLoader__.load({
       );
     }
 
-    /** Blue download glyph for the remote-update entry. */
+    /** Blue download glyph for the remote-update entry; alerts on new versions. */
     function UpdateIcon() {
       return h(
         'svg',
@@ -1169,6 +1176,30 @@ window.__ModuleLoader__.load({
         h('path', { d: 'M12 4V13', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
         h('path', { d: 'M8 9L12 13L16 9', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
         h('path', { d: 'M5.5 19H18.5', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round' }),
+      );
+    }
+
+    /** Circular-arrows glyph for the stats refresh action. */
+    function RefreshIcon() {
+      return h(
+        'svg',
+        { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+        h('path', { d: 'M3 12A9 9 0 0 1 12 3C14.7 3 17.1 4.2 18.7 6.1L21 8.5', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+        h('path', { d: 'M21 3V8.5H15.5', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+        h('path', { d: 'M21 12A9 9 0 0 1 12 21C9.3 21 6.9 19.8 5.3 17.9L3 15.5', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+        h('path', { d: 'M3 21V15.5H8.5', stroke: 'currentColor', 'stroke-width': 2.2, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }),
+      );
+    }
+
+    /** Palette glyph for the skin entry. */
+    function PaletteIcon() {
+      return h(
+        'svg',
+        { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+        h('circle', { cx: 12, cy: 12, r: 8.6, stroke: 'currentColor', 'stroke-width': 2 }),
+        h('circle', { cx: 9.2, cy: 10, r: 1.4, fill: 'currentColor' }),
+        h('circle', { cx: 14.8, cy: 10, r: 1.4, fill: 'currentColor' }),
+        h('circle', { cx: 12, cy: 14.6, r: 1.4, fill: 'currentColor' }),
       );
     }
 
@@ -1193,6 +1224,7 @@ window.__ModuleLoader__.load({
       const quipDeckRef = React.useRef({});
       const [canUpdate, setCanUpdate] = React.useState(false);
       const [updateState, setUpdateState] = React.useState(null);
+      const [updateLatest, setUpdateLatest] = React.useState(null);
       const [errorText, setErrorText] = React.useState('');
       const [expanded, setExpanded] = React.useState(() => new Set());
       const [report, setReport] = React.useState(null);
@@ -1262,6 +1294,21 @@ window.__ModuleLoader__.load({
           alive = false;
         };
       }, []);
+
+      // Probe the registry on load and on every stats refresh, so the download
+      // icon can highlight itself before the user ever clicks it.
+      React.useEffect(() => {
+        if (!canUpdate) return;
+        let alive = true;
+        fetchJson('ganleme/update')
+          .then((status) => {
+            if (alive) setUpdateLatest(status.updateAvailable ? status.latest : null);
+          })
+          .catch(() => {});
+        return () => {
+          alive = false;
+        };
+      }, [canUpdate, tick]);
 
       React.useEffect(() => {
         let alive = true;
@@ -1430,6 +1477,7 @@ window.__ModuleLoader__.load({
         let target;
         try {
           target = await fetchJson('ganleme/update');
+          setUpdateLatest(target.updateAvailable ? target.latest : null);
         } catch (error) {
           flashUpdate({ phase: 'error', message: fmt(t('update.failed'), { message: String(error?.message ?? error) }) });
           return;
@@ -1564,17 +1612,18 @@ window.__ModuleLoader__.load({
                 ? h(
                     'button',
                     {
-                      className: 'gl-btn gl-updateBtn',
-                      'aria-label': t('update.aria'),
-                      title: updateState?.message || t('update.aria'),
+                      className: 'gl-iconBtn',
+                      'data-alert': !!updateLatest,
+                      'aria-label': updateLatest ? fmt(t('update.available'), { version: updateLatest }) : t('update.aria'),
+                      title: updateLatest ? fmt(t('update.available'), { version: updateLatest }) : updateState?.message || t('update.aria'),
                       disabled: !!updateState && (updateState.phase === 'checking' || updateState.phase === 'updating'),
                       onClick: runUpdate,
                     },
                     h(UpdateIcon),
                   )
                 : null,
-              h('button', { className: 'gl-btn', onClick: refresh }, t('refresh')),
-              h('button', { className: 'gl-btn', onClick: () => setSkinOpen(true) }, t('skin.label')),
+              h('button', { className: 'gl-iconBtn', 'aria-label': t('refresh'), title: t('refresh'), onClick: refresh }, h(RefreshIcon)),
+              h('button', { className: 'gl-iconBtn', 'aria-label': t('skin.label'), title: t('skin.label'), onClick: () => setSkinOpen(true) }, h(PaletteIcon)),
             ),
           ),
           h(
