@@ -1931,7 +1931,7 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------------
 
     return {
-      inject: ['slots', 'locale'],
+      inject: ['slots', 'locale', 'remote'],
       apply(ctx) {
         ctx.effect(() => {
           const tag = document.createElement('style');

@@ -27,7 +27,7 @@ import z from './vendor/schemastery.mjs';
 export const name = 'ganleme';
 
 /** The route carrier, the trust fence, the workspace registry, and the PATH resolver. */
-export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess'];
+export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess', 'configEditor'];
 
 export const Config = z.object({
   /** Additional directories scanned for git repositories (see scanDepth). */
