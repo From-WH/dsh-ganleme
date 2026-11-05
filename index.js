@@ -27,7 +27,7 @@ import z from './vendor/schemastery.mjs';
 export const name = 'ganleme';
 
 /** The route carrier, the trust fence, the workspace registry, and the PATH resolver. */
-export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess', 'configEditor'];
+export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess', 'configEditor', 'directoryPickerController'];
 
 export const Config = z.object({
   /** Additional directories scanned for git repositories (see scanDepth). */
@@ -792,6 +792,67 @@ export function apply(ctx, config) {
         },
       }),
     'ganleme: GET /ganleme/roots',
+  );
+
+  // Opens the host's native directory picker, scans the chosen folder and
+  // persists the result as an extra root in one round trip.
+  ctx.effect(
+    () =>
+      ctx.webServer.register({
+        kind: 'exact',
+        path: '/ganleme/roots/pick',
+        handler: async (req, res) => {
+          if (rejected(req, res)) return;
+          if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
+          let picker;
+          try {
+            picker = ctx.directoryPickerController;
+          } catch {
+            picker = undefined;
+          }
+          if (!picker || typeof picker.pick !== 'function') {
+            sendJson(res, 501, { code: 'picker-unavailable', message: 'directory picker is not available in this deployment' });
+            return;
+          }
+          let picked;
+          try {
+            picked = await picker.pick();
+          } catch (error) {
+            sendJson(res, 502, { code: 'pick-failed', message: String(error?.message ?? error) });
+            return;
+          }
+          if (!picked) {
+            sendJson(res, 200, { roots: config.extraRoots ?? [], picked: false });
+            return;
+          }
+          const canon = await realpath(picked).catch(() => picked);
+          if (!isAbsolute(canon) || !(await dirExists(canon))) {
+            sendJson(res, 400, { code: 'bad-path', message: `directory does not exist: ${canon}` });
+            return;
+          }
+          const current = (config.extraRoots ?? []).map((p) => String(p));
+          try {
+            let before = 0;
+            let nextRoots = null;
+            // Idempotent on the write chain: the running config may lag behind
+            // the persisted override until HMR recomposes.
+            await updateExtraRoots((list) => {
+              before = list.length;
+              nextRoots = list.some((p) => p.replace(/[\\/]+$/, '') === canon) ? list : [...list, canon];
+              return nextRoots;
+            });
+            sendJson(res, 200, {
+              roots: nextRoots ?? current,
+              picked: true,
+              added: nextRoots !== null && nextRoots.length !== before,
+              path: canon,
+            });
+          } catch (error) {
+            sendJson(res, 501, { code: 'persist-failed', message: String(error?.message ?? error) });
+          }
+        },
+      }),
+    'ganleme: POST /ganleme/roots/pick',
   );
 
   ctx.effect(

@@ -1283,7 +1283,7 @@ window.__ModuleLoader__.load({
     }
 
     /** The full-page dashboard bound to the `ganleme` main-panel key. */
-    function DashboardPage({ t, pickDirectory, canPick, addRoot, removeRoot, loadRoots }) {
+    function DashboardPage({ t, addRootPick, addRoot, removeRoot, loadRoots }) {
       const [range, setRange] = React.useState('today');
       const [scope, setScope] = React.useState('all');
       const [reportScope, setReportScope] = React.useState('mine');
@@ -1523,14 +1523,22 @@ window.__ModuleLoader__.load({
 
       const addRootFromPicker = async () => {
         if (rootsBusy) return;
-        const path = await pickDirectory();
-        if (!path) return;
         setRootsBusy(true);
+        setRootsMsg('');
         try {
-          const result = await addRoot(path);
+          // One round trip: the Host opens the native picker, scans the chosen
+          // folder and persists the resulting roots.
+          const result = await addRootPick();
           setRoots(Array.isArray(result.roots) ? result.roots : []);
-          setRootsMsg(result.added === false ? t('projects.exists') : fmt(t('projects.added'), { path: result.path }));
-          refresh();
+          if (result.picked === false) {
+            setRootsMsg('');
+          } else if (result.added === false) {
+            setRootsMsg(t('projects.exists'));
+            refresh();
+          } else {
+            setRootsMsg(fmt(t('projects.added'), { path: result.path }));
+            refresh();
+          }
         } catch (error) {
           setRootsMsg(fmt(t('projects.addFailed'), { message: String(error?.message ?? error) }));
         } finally {
@@ -1759,9 +1767,7 @@ window.__ModuleLoader__.load({
                   )
                 : null,
               h('button', { className: 'gl-iconBtn', 'aria-label': t('refresh'), title: t('refresh'), onClick: refresh }, h(RefreshIcon)),
-              canPick
-                ? h('button', { className: 'gl-iconBtn', 'aria-label': t('projects.label'), title: t('projects.label'), onClick: openRoots }, h(FolderPlusIcon))
-                : null,
+              h('button', { className: 'gl-iconBtn', 'aria-label': t('projects.label'), title: t('projects.label'), onClick: openRoots }, h(FolderPlusIcon)),
               h('button', { className: 'gl-iconBtn', 'aria-label': t('skin.label'), title: t('skin.label'), onClick: () => setSkinOpen(true) }, h(PaletteIcon)),
             ),
           ),
@@ -1931,7 +1937,7 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------------
 
     return {
-      inject: ['slots', 'locale', 'remote'],
+      inject: ['slots', 'locale'],
       apply(ctx) {
         ctx.effect(() => {
           const tag = document.createElement('style');
@@ -1953,15 +1959,11 @@ window.__ModuleLoader__.load({
         );
         /** Browser → Host face: the native directory picker and project-source routes. */
         const face = {
-          get canPick() {
-            return typeof ctx.remote?.directoryPicker?.pick === 'function';
-          },
-          async pickDirectory() {
-            try {
-              return (await ctx.remote?.directoryPicker?.pick()) ?? null;
-            } catch {
-              return null;
-            }
+          async addRootPick() {
+            const res = await fetch('ganleme/roots/pick', { method: 'POST' });
+            const body = await res.json().catch(() => null);
+            if (!res.ok) throw new Error(body?.message || `HTTP ${res.status}`);
+            return body;
           },
           async addRoot(path) {
             const res = await fetch('ganleme/roots/add', {
