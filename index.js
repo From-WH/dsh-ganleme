@@ -21,7 +21,7 @@ import { readFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, dirname, isAbsolute, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import z from '@deepseek-ai/schemastery';
+import z from './vendor/schemastery.mjs';
 
 /** Cordis function-plugin name. */
 export const name = 'ganleme';
