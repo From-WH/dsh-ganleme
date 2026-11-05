@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Git Pulse",
+    "description": "Per-workspace git commit and line-change stats for today, yesterday, this week, and this month, with one-click daily, weekly, and monthly reports."
+  }
+}

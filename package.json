@@ -1,0 +1,45 @@
+{
+  "name": "@from-wh/ganleme",
+  "version": "1.0.0",
+  "description": "干了么：各工作区 git 提交统计与日报/周报/月报生成",
+  "type": "module",
+  "license": "MIT",
+  "author": "From-WH",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/From-WH/dsh-ganleme.git"
+  },
+  "homepage": "https://github.com/From-WH/dsh-ganleme#readme",
+  "keywords": [
+    "deepseek-harness",
+    "dsh-plugin",
+    "git",
+    "daily-report",
+    "stats"
+  ],
+  "engines": {
+    "dsh": ">=0.2.1-rc.0"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": ["index.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg"],
+  "dsh": {
+    "bundle": { "patch": "./cordis.patch.yml" },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": ["@deepseek-ai/dsh-client-locale"]
+    }
+  },
+  "dependencies": {
+    "@deepseek-ai/schemastery": "~3.18.5"
+  }
+}

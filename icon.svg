@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="gl-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#24365e"/>
+      <stop offset="1" stop-color="#0c1428"/>
+    </linearGradient>
+    <radialGradient id="gl-glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3aa6ff" stop-opacity="0.26"/>
+      <stop offset="1" stop-color="#3aa6ff" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gl-bar1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#34d9f2"/>
+      <stop offset="1" stop-color="#0e9cc4"/>
+    </linearGradient>
+    <linearGradient id="gl-bar2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5fa2f7"/>
+      <stop offset="1" stop-color="#2f5fe0"/>
+    </linearGradient>
+    <linearGradient id="gl-bar3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#b78efc"/>
+      <stop offset="1" stop-color="#7c46e8"/>
+    </linearGradient>
+    <linearGradient id="gl-person" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#c9d9f2"/>
+    </linearGradient>
+    <linearGradient id="gl-fish" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#6fe6f7"/>
+      <stop offset="1" stop-color="#12a5c9"/>
+    </linearGradient>
+  </defs>
+
+  <rect x="4" y="4" width="56" height="56" rx="14" fill="url(#gl-bg)"/>
+  <ellipse cx="33" cy="40" rx="23" ry="17" fill="url(#gl-glow)"/>
+
+  <rect x="13" y="41" width="10" height="12" rx="3" fill="url(#gl-bar1)"/>
+  <rect x="26" y="33" width="10" height="20" rx="3" fill="url(#gl-bar2)"/>
+  <rect x="39" y="25" width="10" height="28" rx="3" fill="url(#gl-bar3)"/>
+
+  <ellipse cx="16" cy="36.5" rx="5" ry="3.1" fill="url(#gl-fish)"/>
+  <path d="M20.8 36.5L24.6 34.2V38.8Z" fill="url(#gl-fish)"/>
+  <path d="M14.6 33.8L16.4 32.2L18 34Z" fill="#0ea5e9"/>
+  <circle cx="13.9" cy="35.9" r="0.85" fill="#0c1428"/>
+  <circle cx="23.5" cy="31.5" r="1.4" fill="#7de3f5" opacity="0.75"/>
+  <circle cx="26.3" cy="28.6" r="1.05" fill="#7de3f5" opacity="0.6"/>
+  <circle cx="28.6" cy="26.2" r="0.75" fill="#7de3f5" opacity="0.45"/>
+
+  <rect x="37" y="22" width="8.5" height="4.8" rx="2.4" fill="url(#gl-person)"/>
+  <rect x="35.4" y="25.5" width="4.6" height="8" rx="2.3" fill="url(#gl-person)"/>
+  <rect x="42.5" y="12" width="7" height="14" rx="3.5" fill="url(#gl-person)"/>
+  <circle cx="46" cy="9.8" r="3.9" fill="url(#gl-person)"/>
+  <circle cx="43.6" cy="11" r="0.72" fill="#0c1428"/>
+  <circle cx="46.6" cy="11.2" r="0.72" fill="#0c1428"/>
+
+  <path d="M12 14L13 17L16 18L13 19L12 22L11 19L8 18L11 17Z" fill="#dfe9ff" opacity="0.85"/>
+  <path d="M19.5 9L20.1 10.9L22 11.5L20.1 12.1L19.5 14L18.9 12.1L17 11.5L18.9 10.9Z" fill="#dfe9ff" opacity="0.6"/>
+</svg>
