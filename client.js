@@ -1397,6 +1397,12 @@ window.__ModuleLoader__.load({
             poolRef.current = collected;
             setPoolCount(collected.length);
             setImportState(null);
+            if (collected.length > 0) {
+              // A freshly imported library should show right away: default the
+              // daily rotation on so today's pick renders immediately.
+              setDailyRandom(true);
+              writeStored(BG_DAILY_KEY, '1');
+            }
             let note;
             if (collected.length === 0) note = t('skin.uploadFailed');
             else if (failed > 0) note = fmt(t('skin.importPartial'), { done: collected.length, failed });
