@@ -1,6 +1,6 @@
 {
   "name": "dsh-ganleme",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "干了么：各工作区 git 提交统计与日报/周报/月报生成",
   "type": "module",
   "license": "MIT",
