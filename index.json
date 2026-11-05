@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "title": {
+    "en": "From-WH's DSH Plugins",
+    "zh": "From-WH 的 DSH 插件"
+  },
+  "description": {
+    "en": "Handcrafted plugins for the DeepSeek Harness.",
+    "zh": "为 DeepSeek Harness 打造的插件。"
+  },
+  "metadata": {
+    "categories": {
+      "productivity": {
+        "title": {
+          "en": "Productivity",
+          "zh": "效率"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-ganleme",
+      "title": {
+        "zh": "干了么",
+        "en": "Git Pulse"
+      },
+      "description": {
+        "zh": "统计各工作区今天/昨天/本周/本月的 git 提交与变更行数，一键生成日报、周报、月报；支持只看我、夸夸锐评、换肤、背景图库与每日随机，配置 updatePackage 后可右上角一键自更新。",
+        "en": "Per-workspace git commit and line-change stats for today/yesterday/this week/this month, with one-click daily/weekly/monthly reports, mine-only attribution, praise-and-roast quips, skins, background libraries, and self-update."
+      },
+      "icon": "./icon.svg",
+      "author": "From-WH",
+      "homepage": "https://github.com/From-WH/dsh-ganleme",
+      "repository": {
+        "url": "https://github.com/From-WH/dsh-ganleme"
+      },
+      "metadata": {
+        "category": "productivity",
+        "keywords": [
+          "git",
+          "日报",
+          "周报",
+          "月报",
+          "统计",
+          "摸鱼"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.1.0",
+          "publishTimestamp": 1793850827,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.0"
+          }
+        }
+      ]
+    }
+  ]
+}
