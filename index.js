@@ -43,7 +43,7 @@ export const Config = z.object({
   /** Override for "my" author name; used when no email identity resolves. */
   myName: z.string().default(''),
   /** npm package name this plugin publishes under; empty disables remote updates. */
-  updatePackage: z.string().default(''),
+  updatePackage: z.string().default('dsh-ganleme'),
   /** Registry asked for the latest version lookup; installs follow the profile's registry plan. */
   updateRegistry: z.string().default('https://registry.npmjs.org/'),
 });
