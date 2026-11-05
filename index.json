@@ -56,6 +56,36 @@
           "engines": {
             "dsh": ">=0.2.1-rc.0"
           }
+        },
+        {
+          "version": "0.1.1",
+          "publishTimestamp": 1793860537,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.0"
+          }
+        },
+        {
+          "version": "0.2.0",
+          "publishTimestamp": 1793862672,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.0"
+          }
+        },
+        {
+          "version": "0.2.1",
+          "publishTimestamp": 1793866209,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.1-rc.0"
+          }
         }
       ]
     }
