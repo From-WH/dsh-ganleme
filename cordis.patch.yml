@@ -1,5 +1,5 @@
 - insert:
     - id: ganleme
-      name: '@from-wh/ganleme'
+      name: 'dsh-ganleme'
       config: {}
 

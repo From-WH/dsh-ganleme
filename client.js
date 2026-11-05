@@ -10,14 +10,14 @@
  * from the stats payload as Markdown, with one-click copy.
  */
 window.__ModuleLoader__.load({
-  id: '@from-wh/ganleme',
+  id: 'dsh-ganleme',
   factory(require) {
     const React = require('react');
     const h = React.createElement;
 
     const NS = 'ganleme';
     const PANEL_ID = 'ganleme';
-    const PACKAGE = '@from-wh/ganleme';
+    const PACKAGE = 'dsh-ganleme';
 
     /** Simplified Chinese dictionary and key source of truth. */
     const zh = {
