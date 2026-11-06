@@ -1170,6 +1170,17 @@ window.__ModuleLoader__.load({
       return `${indent}${label}${sep}${body}`;
     }
 
+    /**
+     * Switch to another style. Manual switches only express "differ from the
+     * style's default", so they are dropped when the style changes — otherwise
+     * a ticked "show times" would keep overriding the new style and the choice
+     * of style would appear to do nothing. An explicit numbering choice stays:
+     * it is independent of style semantics.
+     */
+    function withStyle(draft, style) {
+      return { ...draft, style, overrides: {} };
+    }
+
     const resolveReportSpec = (style, overrides = {}) => ({
       ...(REPORT_STYLES[style] ?? REPORT_STYLES.worklog),
       ...Object.fromEntries(
@@ -1264,8 +1275,14 @@ window.__ModuleLoader__.load({
               additions: stats.insertions,
               deletions: stats.deletions,
             });
-            lines.push(plain ? `   ${line}` : '');
-            if (!plain) lines.push(line, '');
+            // Indent only under a heading; a heading-less single repository keeps
+            // column 0, exactly like its commit items.
+            const indent = showRepoHeadings ? '  ' : '';
+            if (plain) {
+              lines.push(`${indent}${line}`, '');
+            } else {
+              lines.push('', line, '');
+            }
           }
 
           shown.forEach((commit, i) => {
@@ -1637,7 +1654,7 @@ window.__ModuleLoader__.load({
                         className: 'gl-styleCard',
                         'aria-pressed': draft.style === id,
                         'data-active': draft.style === id,
-                        onClick: () => onDraft({ ...draft, style: id }),
+                        onClick: () => onDraft(withStyle(draft, id)),
                       },
                       h('span', { className: 'gl-styleName' }, t('report.style.' + id)),
                       h('span', { className: 'gl-styleHint' }, t('report.style.' + id + '.hint')),
@@ -2803,6 +2820,7 @@ window.__ModuleLoader__.load({
         NUMBERING,
         NUMBERING_ORDER,
         formatCommitLine,
+        withStyle,
         reportIntent,
         ReportModal,
         ReportSettings,

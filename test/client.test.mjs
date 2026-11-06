@@ -289,6 +289,49 @@ test('commit prefixes are stripped only when they are real type tags', () => {
   assert.equal(T.stripCommitPrefix('fix: '), 'fix:', 'a bare type is not stripped to nothing');
 });
 
+test('the statistics line aligns with its items in the preview', () => {
+  const one = {
+    ...data,
+    totals: { ...stats(3, 128), repos: 1 },
+    mine: { ...stats(3, 128), repos: 1 },
+    repos: [{
+      ...data.repos[0],
+      stats: stats(3, 128), mine: stats(3, 128),
+      commits: [
+        commit('h1', 'fix: 修复登录', '张三', '2026-11-04T15:40:00.000Z', true, 42),
+        commit('h2', 'feat: 新增导出', '张三', '2026-11-04T14:10:00.000Z', true, 76),
+        commit('h3', 'perf: 优化查询', '张三', '2026-11-04T11:00:00.000Z', true, 10),
+      ],
+    }],
+  };
+  const text = T.buildReport(t, 'daily', one, 'mine', 'plain', { style: 'detailed', limit: 20 });
+  const lines = text.split('\n');
+  const statLine = lines.find((l) => l.includes('3 次提交，新增'));
+  assert.ok(statLine, 'statistics line present');
+  assert.equal(statLine.trimStart(), statLine, 'no indent: a heading-less repo starts at column 0');
+  const firstItem = lines.find((l) => l.includes('修复登录'));
+  assert.equal(firstItem.trimStart(), firstItem, 'items share the column');
+  // A blank line keeps the stats line from running into the list.
+  assert.equal(lines[lines.indexOf(statLine) + 1], '', 'blank line between stats and items');
+});
+
+test('switching style clears manual overrides so the style takes effect', async () => {
+  // Regression: ticked overrides survived a style change, so "show times" kept
+  // forcing times on and the style buttons looked dead.
+  const mod = await loadClient();
+  const draft = { style: 'detailed', overrides: { time: true, author: true }, numbering: 'paren', limit: 20, format: 'plain', scope: 'mine' };
+  const next = mod.__test.withStyle(draft, 'worklog');
+  assert.equal(next.style, 'worklog');
+  assert.deepEqual(next.overrides, {}, 'manual switches dropped with the old style');
+  assert.equal(next.numbering, 'paren', 'explicit numbering choice is independent');
+  const spec = mod.__test.resolveReportSpec(next.style, next.overrides);
+  assert.equal(spec.time, false, 'worklog has no times');
+  assert.equal(spec.author, false);
+  // The cleared draft now renders the new style's own shape.
+  const text = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: next.style, overrides: next.overrides });
+  assert.ok(!/\d{2}:\d{2}/.test(text), 'no times after switching to worklog');
+});
+
 test('repos without git identity are named in mine reports', () => {
   const extra = { ...data, repos: [...data.repos, { key: 'c', title: 'repo-c', ok: true, me: null, stats: stats(1, 1), mine: stats(0, 0), commits: [] }] };
   assert.ok(T.buildReport(t, 'daily', extra, 'mine', 'plain', { style: 'worklog' }).includes('repo-c'));
