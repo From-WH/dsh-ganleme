@@ -13,8 +13,9 @@ const testDir = join(root, 'test');
 const units = readdirSync(testDir).filter((f) => f.endsWith('.test.mjs')).map((f) => join(testDir, f));
 
 let failed = false;
+// Report fixtures are written in Asia/Shanghai wall-clock time.
 const run = (bin, args, env = {}) => {
-  const r = spawnSync(bin, args, { stdio: 'inherit', env: { ...process.env, ...env } });
+  const r = spawnSync(bin, args, { stdio: 'inherit', env: { ...process.env, TZ: 'Asia/Shanghai', ...env } });
   if (r.status !== 0) failed = true;
 };
 

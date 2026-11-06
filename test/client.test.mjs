@@ -115,6 +115,25 @@ test('date presets and custom range validation', () => {
   assert.equal(T.customRangeError('2026-11-07', '2026-11-07', now), 'custom.errFuture');
   assert.equal(T.customRangeError('2026-11-05', '2026-11-01', now), 'custom.errOrder');
   assert.equal(T.customRangeError('2024-01-01', '2026-11-01', now), 'custom.errSpan');
+  assert.equal(T.customRangeError('', '2026-11-01', now), 'custom.errIncomplete', 'a cleared date is not an order error');
+});
+
+test('a daily report is dated by the day it covers', () => {
+  const yesterday = { ...data, from: '2026-11-03T16:00:00.000Z', to: '2026-11-04T16:00:00.000Z', generatedAt: '2026-11-05T01:00:00.000Z' };
+  assert.ok(T.buildReport(t, 'daily', yesterday, 'mine', 'plain', false).startsWith('日报 · 2026-11-04'));
+});
+
+test('on the Yesterday tab the daily report button covers yesterday', async () => {
+  const mod = await loadClient({ react: fakeReact({ 0: 'yesterday' }) });
+  const registered = [];
+  mod.apply({
+    effect() {},
+    locale: { register() {}, bind: () => (k) => k },
+    slots: { inject: (_name, cb) => cb(), register: (opts, comp) => registered.push({ opts, comp }) },
+  });
+  const page = registered.find((r) => r.opts.name === 'main');
+  const tree = JSON.stringify(page.comp({ t: (k) => k, addRootPick: async () => ({}), addRoot: async () => ({}), removeRoot: async () => ({}), loadRoots: async () => [] }));
+  assert.ok(tree.includes('report.dailyYesterday'));
 });
 
 test('uploaded background lives in IndexedDB, apart from the folder library', async () => {

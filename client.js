@@ -36,6 +36,7 @@ window.__ModuleLoader__.load({
       'custom.lastWeek': '上周',
       'custom.lastMonth': '上月',
       'custom.errOrder': '开始日期不能晚于结束日期',
+      'custom.errIncomplete': '请选择完整的开始和结束日期',
       'custom.errFuture': '不能选择今天之后的日期',
       'custom.errSpan': '范围不能超过 366 天',
       'report.range': '生成区间报告',
@@ -67,6 +68,7 @@ window.__ModuleLoader__.load({
       'authors.more': '等 {n} 人',
       'commits.more': '还有 {n} 条未展示',
       'report.daily': '生成日报',
+      'report.dailyYesterday': '生成昨日日报',
       'report.weekly': '生成周报',
       'report.monthly': '生成月报',
       'report.title.daily': '日报',
@@ -153,6 +155,7 @@ window.__ModuleLoader__.load({
       'custom.lastWeek': 'Last week',
       'custom.lastMonth': 'Last month',
       'custom.errOrder': 'The start date must not be after the end date',
+      'custom.errIncomplete': 'Choose both a start and an end date',
       'custom.errFuture': 'Dates after today cannot be selected',
       'custom.errSpan': 'The range must not exceed 366 days',
       'report.range': 'Range report',
@@ -184,6 +187,7 @@ window.__ModuleLoader__.load({
       'authors.more': ' +{n} more',
       'commits.more': '{n} more commits not shown',
       'report.daily': 'Daily report',
+      'report.dailyYesterday': "Yesterday's report",
       'report.weekly': 'Weekly report',
       'report.monthly': 'Monthly report',
       'report.title.daily': 'Daily Report',
@@ -639,7 +643,7 @@ window.__ModuleLoader__.load({
     function customRangeError(fromStr, toStr, now = new Date()) {
       const from = parseDay(fromStr);
       const to = parseDay(toStr);
-      if (!from || !to) return 'custom.errOrder';
+      if (!from || !to) return 'custom.errIncomplete';
       if (from > to) return 'custom.errOrder';
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       if (to > today) return 'custom.errFuture';
@@ -870,7 +874,9 @@ window.__ModuleLoader__.load({
       const plain = format !== 'markdown';
       const totals = scope === 'mine' ? data.mine : data.totals;
       const perRepo = (repo) => (scope === 'mine' ? repo.mine : repo.stats);
-      const date = new Date(data.generatedAt);
+      // A daily report is dated by the day it covers (a report written this
+      // morning for yesterday says yesterday); longer reports by when they ran.
+      const date = new Date(kind === 'daily' ? data.from : data.generatedAt);
       const active = data.repos.filter((repo) => repo.ok && perRepo(repo).commits > 0);
       const failed = data.repos.filter((repo) => !repo.ok);
       const unknown = scope === 'mine' ? data.repos.filter((repo) => repo.ok && !repo.me).map((repo) => repo.title) : [];
@@ -2003,13 +2009,16 @@ window.__ModuleLoader__.load({
             h(
               'div',
               { className: 'gl-actions' },
-              REPORT_KINDS.map((entry) =>
-                h(
+              REPORT_KINDS.map((entry) => {
+                // On the Yesterday tab, the daily report covers yesterday: the
+                // usual morning task of writing up the previous day.
+                const resolved = entry.kind === 'daily' && range === 'yesterday' ? { ...entry, range: 'yesterday', key: 'report.dailyYesterday' } : entry;
+                return h(
                   'button',
-                  { key: entry.kind, className: 'gl-btn', onClick: () => generateReport(entry) },
-                  t(entry.key),
-                ),
-              ),
+                  { key: entry.kind, className: 'gl-btn', onClick: () => generateReport(resolved) },
+                  t(resolved.key),
+                );
+              }),
             ),
           ),
           range === 'custom'
