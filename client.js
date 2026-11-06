@@ -54,6 +54,8 @@ window.__ModuleLoader__.load({
       'scope.all': '全部人',
       'scope.mine': '只看我',
       'repo.noIdentity': '未配置 git 身份',
+      'repo.truncated': '可能不完整',
+      'repo.truncatedHint': '读取的提交数达到 commitLimit 上限，较早的提交可能没有统计到。可在插件配置里调大 commitLimit。',
       'empty': '这段时间没有提交记录',
       'emptyHint': '在插件配置里添加 extraRoots 可以统计更多目录',
       'empty.mine': '没有识别到你的提交',
@@ -168,6 +170,8 @@ window.__ModuleLoader__.load({
       'scope.all': 'Everyone',
       'scope.mine': 'Mine only',
       'repo.noIdentity': 'No git identity',
+      'repo.truncated': 'May be incomplete',
+      'repo.truncatedHint': 'The number of commits read reached commitLimit, so older commits may be missing. Raise commitLimit in the plugin configuration.',
       'empty': 'No commits in this period',
       'emptyHint': 'Add extraRoots in the plugin configuration to cover more directories',
       'empty.mine': 'None of your commits were recognized',
@@ -1013,6 +1017,9 @@ window.__ModuleLoader__.load({
           h('span', { className: 'gl-chip' }, t('source.' + repo.source)),
           scope === 'mine' && !repo.me
             ? h('span', { className: 'gl-chip gl-chipWarn', title: t('emptyHint.mine') }, t('repo.noIdentity'))
+            : null,
+          repo.truncated
+            ? h('span', { className: 'gl-chip gl-chipWarn', title: t('repo.truncatedHint') }, t('repo.truncated'))
             : null,
           h(
             'span',

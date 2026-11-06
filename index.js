@@ -72,6 +72,13 @@ const REPOS_CACHE_MS = 15_000;
 const COMMIT_LIST_CAP = 200;
 /** git log upper bound; a repository cannot exceed this per query. */
 const GIT_TIMEOUT_MS = 30_000;
+/**
+ * A commit is counted on its author date: the day the work was written, which
+ * rebase, amend and cherry-pick keep. git's --since/--until filter on the
+ * committer date instead, which those rewrites move, so the git query is
+ * widened by this many days on each side and parseLog narrows it again.
+ */
+const REWRITE_BUFFER_DAYS = 30;
 
 // ---------------------------------------------------------------------------
 // Time windows (Host-local calendar; "week" starts on Monday)
@@ -380,10 +387,10 @@ async function repoStats(git, repo, window, config) {
     'log',
     `--pretty=format:${RECORD}%H${FIELD}%h${FIELD}%an${FIELD}%ae${FIELD}%at${FIELD}%s`,
     '--numstat',
-    '--since=' + isoLocal(window.from),
+    '--since=' + isoLocal(addDays(window.from, -REWRITE_BUFFER_DAYS)),
     // Bound the end too: for a past range, newer commits would otherwise use
     // up the commitLimit before git reaches the requested window.
-    '--until=' + isoLocal(window.to),
+    '--until=' + isoLocal(addDays(window.to, REWRITE_BUFFER_DAYS)),
     `--max-count=${Math.max(1, config.commitLimit)}`,
   ];
   const [logRun, branchRun, me] = await Promise.all([
@@ -396,6 +403,9 @@ async function repoStats(git, repo, window, config) {
   }
   const isMine = identityMatcher(me);
   const commits = parseLog(logRun.stdout, window, isMine);
+  // git stopped at --max-count: older commits in the window may be missing.
+  const limit = Math.max(1, config.commitLimit);
+  const truncated = logRun.stdout.split(RECORD).length - 1 >= limit;
   return {
     ...repo,
     ok: true,
@@ -405,6 +415,7 @@ async function repoStats(git, repo, window, config) {
     mine: aggregate(commits.filter((commit) => commit.mine)),
     commits: commits.slice(0, COMMIT_LIST_CAP),
     commitsTotal: commits.length,
+    truncated,
   };
 }
 

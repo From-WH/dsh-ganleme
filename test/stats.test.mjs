@@ -57,13 +57,36 @@ test('the legacy myEmail setting still works alongside myEmails', async () => {
   assert.equal((await stats(call, { from: D, to: D })).json.mine.commits, 1);
 });
 
+test('a rebased commit counts on the day it was written', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'base', date: at(-9) });
+  // Authored two days ago, rewritten (rebased/amended) today.
+  commit(repo, { message: 'rebased', authorDate: at(-2), date: at(0, '00:30') });
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  const written = await stats(call, { from: D, to: D });
+  assert.deepEqual(written.json.repos[0].commits.map((c) => c.subject), ['rebased']);
+  const rewrittenDay = await stats(call, { from: day(0), to: day(0) });
+  assert.equal(rewrittenDay.json.totals.commits, 0, 'not double-counted on the rebase day');
+});
+
 test('a past window is bounded by --until even with a tiny commitLimit', async () => {
   const repo = makeRepo();
-  commit(repo, { message: 'in window', date: at(-3) });
+  commit(repo, { message: 'in window', date: at(-45) });
+  // Beyond the rewrite buffer after the window, so --until keeps it out.
   commit(repo, { message: 'newer', date: at(-1) });
   const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }], config: { commitLimit: 1 } });
-  const { json } = await stats(call, { from: day(-3), to: day(-3) });
+  const { json } = await stats(call, { from: day(-45), to: day(-45) });
   assert.deepEqual(json.repos[0].commits.map((c) => c.subject), ['in window']);
+});
+
+test('hitting commitLimit marks the repo as possibly incomplete', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'a', date: at(-2, '09:00') });
+  commit(repo, { message: 'b', date: at(-2, '10:00') });
+  const limited = await makeHost({ workspaces: [{ path: repo, title: 'r' }], config: { commitLimit: 1 } });
+  assert.equal((await stats(limited.call, { from: D, to: D })).json.repos[0].truncated, true);
+  const roomy = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  assert.equal((await stats(roomy.call, { from: D, to: D })).json.repos[0].truncated, false);
 });
 
 test('custom ranges are validated', async () => {
