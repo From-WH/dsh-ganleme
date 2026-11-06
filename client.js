@@ -2085,6 +2085,24 @@ window.__ModuleLoader__.load({
 
     return {
       inject: ['slots', 'locale'],
+      /** Pure helpers exposed for the repository's test suite; not a runtime API. */
+      __test: {
+        buildReport,
+        windowLabel,
+        presetRange,
+        customRangeError,
+        makeQuipDeck,
+        quipCategory,
+        QUIP_POOLS,
+        QUIP_MOOD,
+        SKINS,
+        veilOf,
+        readStored,
+        writeStored,
+        dailyIndex,
+        imageFiles,
+        fmtDate,
+      },
       apply(ctx) {
         ctx.effect(() => {
           const tag = document.createElement('style');

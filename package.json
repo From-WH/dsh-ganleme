@@ -20,6 +20,9 @@
   "engines": {
     "dsh": ">=0.2.1-rc.0"
   },
+  "scripts": {
+    "test": "node scripts/test.mjs"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/",
     "access": "public"
