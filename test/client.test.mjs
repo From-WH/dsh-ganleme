@@ -146,41 +146,112 @@ test('numbering styles render their own markers', () => {
   assert.deepEqual(body('none').map((l) => l.trim()), ['修复登录', '新增导出', '优化查询']);
 });
 
-test('numbering buttons are enabled for plain text and disabled for Markdown', async () => {
-  // Regression: the condition was inverted, so every marker button was disabled
-  // in the default plain-text format and numbering could not be changed.
+test('numbering choices are live in plain text and inert for Markdown', async () => {
+  // Regression: the condition was once inverted, so every marker button was
+  // disabled in the default plain format. The choices now live in the settings
+  // sheet; they must be clickable there and explain themselves for Markdown.
   const captured = [];
-  const React = { ...fakeReact(), createElement: (type, props, ...kids) => (captured.push({ type, props }), { type, props }) };
+  const React = { ...fakeReact(), createElement: (type, props) => (captured.push({ type, props }), { type, props }) };
   const mod = await loadClient({ react: React });
   const render = (format) => {
     captured.length = 0;
-    mod.__test.ReportModal({
-      report: { kind: 'daily', data: {}, text: 'x' },
-      scope: 'mine', onScope() {}, format, onFormat() {}, style: 'worklog', onStyle() {},
-      overrides: {}, onToggle() {}, numbering: 'dash', onNumbering() {}, limit: 20, onLimit() {},
-      onClose() {}, onCopy() {}, copied: false, t: (k) => k,
+    mod.__test.ReportSettings({
+      draft: { ...mod.__test.DEFAULT_REPORT_CONFIG, format },
+      onDraft() {}, preview: '', firstRun: false, onSave() {}, onCancel() {}, t: (k) => k,
     });
     const marker = /^(dash|bullet|numbered|paren|none)$/;
     return captured.filter((c) => c.type === 'button' && marker.test(String(c.props.key)));
   };
   const plain = render('plain');
   const markdown = render('markdown');
-  assert.equal(plain.length, 5, 'five marker buttons');
-  assert.ok(plain.every((b) => !b.props.disabled), 'clickable in the default plain format');
-  assert.ok(markdown.every((b) => b.props.disabled), 'disabled for Markdown');
-  // Clicking one must reach the handler with its id.
+  assert.equal(plain.length, 5, 'five marker choices');
+  assert.ok(plain.every((b) => !b.props.disabled), 'clickable for plain text');
+  assert.ok(markdown.every((b) => !b.props.disabled), 'still selectable for Markdown');
+  // The choice reaches the draft handler with its id.
   const seen = [];
   captured.length = 0;
-  mod.__test.ReportModal({
-    report: { kind: 'daily', data: {}, text: 'x' },
-    scope: 'mine', onScope() {}, format: 'plain', onFormat() {}, style: 'worklog', onStyle() {},
-    overrides: {}, onToggle() {}, numbering: 'dash', onNumbering: (id) => seen.push(id), limit: 20,
-    onLimit() {}, onClose() {}, onCopy() {}, copied: false, t: (k) => k,
+  mod.__test.ReportSettings({
+    draft: { ...mod.__test.DEFAULT_REPORT_CONFIG },
+    onDraft: (next) => seen.push(next.numbering), preview: '', firstRun: false,
+    onSave() {}, onCancel() {}, t: (k) => k,
   });
-  const cn = captured.find((c) => c.type === 'button' && c.props.key === 'paren');
-  cn.props.onClick();
+  captured.find((c) => c.type === 'button' && c.props.key === 'paren').props.onClick();
   assert.deepEqual(seen, ['paren']);
 });
+
+test('the format is asked for once, then reused', async () => {
+  // First generate must open the settings sheet and generate nothing; after
+  // saving, later generates reuse the saved format without asking again.
+  const store = new Map();
+  const React = { ...fakeReact(), createElement: (type, props, ...kids) => ({ type, props }) };
+  const mod = await loadClient({ react: React, storage: store });
+  const T = mod.__test;
+  assert.equal(T.readReportConfig(), null, 'nothing saved yet');
+  T.writeReportConfig({ ...T.DEFAULT_REPORT_CONFIG, style: 'brief', limit: 0 });
+  const saved = T.readReportConfig();
+  assert.equal(saved.style, 'brief');
+  assert.equal(saved.limit, 0);
+  // The sheet renders every group from the draft.
+  const buttons = [];
+  const captured = [];
+  const React2 = { ...fakeReact(), createElement: (type, props) => (captured.push({ type, props }), { type, props }) };
+  const mod2 = await loadClient({ react: React2, storage: new Map() });
+  mod2.__test.ReportSettings({
+    draft: { ...T.DEFAULT_REPORT_CONFIG },
+    onDraft() {}, preview: '预览文本', firstRun: true,
+    onSave() {}, onCancel() {}, t: (k) => k,
+  });
+  const keys = captured.filter((c) => c.type === 'button').map((c) => c.props.key).filter(Boolean);
+  assert.ok(keys.includes('worklog') && keys.includes('detailed'), 'style cards');
+  assert.ok(keys.includes('dash') && keys.includes('none'), 'numbering choices');
+  assert.ok(captured.some((c) => c.type === 'pre' && c.props.className === 'gl-setPreviewBody'), 'live preview area rendered');
+});
+
+test('generate asks for a format only until one is saved', async () => {
+  const mod = await loadClient();
+  const intent = mod.__test.reportIntent;
+  assert.deepEqual(intent({ hasConfig: false, sheetOpen: false }), { action: 'ask', retarget: true });
+  assert.deepEqual(intent({ hasConfig: false, sheetOpen: true }), { action: 'ask', retarget: true },
+    'a second click while the sheet is open retargets, never opens two sheets');
+  assert.deepEqual(intent({ hasConfig: true, sheetOpen: false }), { action: 'generate', retarget: false });
+  assert.deepEqual(intent({ hasConfig: true, sheetOpen: true }), { action: 'generate', retarget: false },
+    'a confirmed format generates and discards a stale sheet');
+});
+
+test('saving a format persists every choice and reuses it next time', async () => {
+  const store = new Map();
+  const mod = await loadClient({ storage: store });
+  const T = mod.__test;
+  const chosen = { style: 'standard', numbering: 'paren', limit: 0, format: 'markdown', scope: 'all', overrides: { author: true } };
+  T.writeReportConfig({ ...T.DEFAULT_REPORT_CONFIG, ...chosen });
+  const reloaded = (await loadClient({ storage: store })).__test.readReportConfig();
+  for (const [key, value] of Object.entries(chosen)) {
+    assert.deepEqual(reloaded[key], value, key);
+  }
+});
+
+test('confirming the format is a one-time step', async () => {
+  const store = new Map();
+  const mod = await loadClient({ storage: store });
+  // Fresh install: no format, so the first generate asks.
+  assert.equal(mod.__test.reportIntent({ hasConfig: !!mod.__test.readReportConfig(), sheetOpen: false }).action, 'ask');
+  mod.__test.writeReportConfig({ ...mod.__test.DEFAULT_REPORT_CONFIG, style: 'brief' });
+  const next = (await loadClient({ storage: store })).__test;
+  assert.equal(next.reportIntent({ hasConfig: !!next.readReportConfig(), sheetOpen: false }).action, 'generate');
+});
+
+test('a sample preview renders for every style and format', async () => {
+  const mod = await loadClient();
+  const T = mod.__test;
+  const t = (k) => k;
+  for (const style of T.REPORT_STYLE_ORDER) {
+    for (const format of ['plain', 'markdown']) {
+      const text = T.buildReport(t, 'daily', T.PREVIEW_DATA, 'mine', format, { style, limit: 20 });
+      assert.ok(text.includes('my-project') || text.includes('修复'), `${style}/${format} renders`);
+    }
+  }
+});
+
 test('one repository drops the heading and starts items at column 0', () => {
   const one = {
     ...data,

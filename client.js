@@ -115,6 +115,30 @@ window.__ModuleLoader__.load({
       'report.toggle.author': '显示提交人',
       'report.toggle.author.hint': '在每条提交后显示提交人（长报告容易忘记是谁写的）',
       'report.numbering': '序号',
+      'report.settings': '格式设置',
+      'report.settings.save': '保存格式',
+      'report.styleHint': '决定报告的整体骨架和取舍',
+      'report.numberingHint': '每条提交前面的标记，仅纯文本格式下生效',
+      'report.numbering.dash.hint': '- 开始的横线',
+      'report.numbering.bullet.hint': '• 开始的圆点',
+      'report.numbering.numbered.hint': '1. 2. 3. 数字编号',
+      'report.numbering.paren.hint': '1）2）3）中文括号',
+      'report.numbering.none.hint': '不显示任何标记',
+      'report.limitHint': '每个仓库最多列出多少条提交，超出的会注明还有多少条',
+      'report.formatHint': '纯文本可以直接贴进公司系统的输入框',
+      'report.format.plain.hint': '无 Markdown 标记，适合贴进文本框',
+      'report.format.markdown.hint': '带标题和列表标记，适合存档或发到支持 Markdown 的地方',
+      'report.advancedHint': '逐项覆盖风格自带的默认值',
+      'report.preview': '预览',
+      'report.firstRun.title': '先设置日报格式',
+      'report.firstRun.badge': '只需设置一次',
+      'report.firstRun.intro': '设置好之后，每次生成都沿用这套格式，不用再调。想改的话，在报告窗口右上角的齿轮里随时调整。',
+      'report.firstRun.save': '保存并生成',
+      'report.firstRun.cancel': '稍后',
+      'report.scopeHint': '只统计所有仓库还是仅你自己',
+      'scope.all.hint': '统计所有仓库的全部提交',
+      'scope.mine.hint': '只统计你自己的提交',
+
       'report.numbering.dash': '- 横线',
       'report.numbering.bullet': '• 圆点',
       'report.numbering.numbered': '1. 数字',
@@ -263,6 +287,30 @@ window.__ModuleLoader__.load({
       'report.toggle.author': 'Show authors',
       'report.toggle.author.hint': 'Name the author after each commit',
       'report.numbering': 'Markers',
+      'report.settings': 'Format settings',
+      'report.settings.save': 'Save format',
+      'report.styleHint': 'Sets the overall shape of the report',
+      'report.numberingHint': 'Marker before each commit; plain text only',
+      'report.numbering.dash.hint': 'A leading dash',
+      'report.numbering.bullet.hint': 'A leading bullet',
+      'report.numbering.numbered.hint': '1. 2. 3. numbering',
+      'report.numbering.paren.hint': '1) 2) 3) parenthesised',
+      'report.numbering.none.hint': 'No marker at all',
+      'report.limitHint': 'Maximum commits listed per repository; the rest are counted',
+      'report.formatHint': 'Plain text pastes straight into a company form',
+      'report.format.plain.hint': 'No Markdown syntax; paste into any text box',
+      'report.format.markdown.hint': 'Headings and list markers for archives or Markdown-aware tools',
+      'report.advancedHint': 'Flip individual defaults of the chosen style',
+      'report.preview': 'Preview',
+      'report.firstRun.title': 'Set up your report format',
+      'report.firstRun.badge': 'Once only',
+      'report.firstRun.intro': 'Every report after this reuses this format. Change it any time from the gear in the report window.',
+      'report.firstRun.save': 'Save and generate',
+      'report.firstRun.cancel': 'Later',
+      'report.scopeHint': 'All repositories, or only yours',
+      'scope.all.hint': 'Every commit in every repository',
+      'scope.mine.hint': 'Only commits that are yours',
+
       'report.numbering.dash': 'Dash',
       'report.numbering.bullet': 'Bullet',
       'report.numbering.numbered': '1. Numbered',
@@ -597,6 +645,31 @@ window.__ModuleLoader__.load({
 .gl-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:32px;z-index:60}
 .gl-modal{width:min(760px,100%);max-height:min(640px,100%);display:flex;flex-direction:column;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,12px);box-shadow:0 16px 48px rgba(0,0,0,.25);overflow:hidden}
 .gl-modalWide{width:min(920px,100%);max-height:min(760px,100%)}
+.gl-btnPrimary{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);color:#fff}
+.gl-btnPrimary:hover{filter:brightness(1.06);background:var(--dsw-alias-brand-primary)}
+.gl-setBody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0.85fr);gap:18px;padding:16px 18px;overflow-y:auto;min-height:0}
+.gl-setForm{display:flex;flex-direction:column;gap:14px;min-width:0}
+.gl-setIntro{margin:0;font-size:12.5px;line-height:19px;color:var(--dsw-alias-label-secondary);padding:10px 12px;border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-2);border-left:2px solid var(--dsw-alias-brand-primary)}
+.gl-setSection{display:flex;flex-direction:column;gap:7px}
+.gl-setHead{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.gl-setTitle{margin:0;font-size:13px;font-weight:600;color:var(--dsw-alias-label-primary)}
+.gl-setHint{margin:0;font-size:11.5px;color:var(--dsw-alias-label-secondary)}
+.gl-choiceGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.gl-choiceGridTight{grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:6px}
+.gl-styleCard{display:flex;flex-direction:column;gap:3px;text-align:left;padding:9px 11px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);cursor:pointer;font:inherit}
+.gl-styleCard:hover{background:var(--dsw-alias-interactive-bg-hover)}
+.gl-styleCard[data-active="true"]{border-color:var(--dsw-alias-brand-primary);box-shadow:inset 0 0 0 1px var(--dsw-alias-brand-primary)}
+.gl-styleName{font-size:13px;font-weight:600}
+.gl-styleHint{font-size:11px;line-height:15px;color:var(--dsw-alias-label-secondary)}
+.gl-choice{padding:5px 10px;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-secondary);font:inherit;font-size:12.5px;cursor:pointer;white-space:nowrap}
+.gl-choice:hover{background:var(--dsw-alias-interactive-bg-hover);color:var(--dsw-alias-label-primary)}
+.gl-choice[data-active="true"]{background:var(--dsw-alias-brand-primary);border-color:var(--dsw-alias-brand-primary);color:#fff}
+.gl-setPreview{display:flex;flex-direction:column;min-width:0;border:1px solid var(--dsw-alias-border-l1);border-radius:var(--dsw-radius-md);background:var(--dsw-alias-bg-layer-2);overflow:hidden}
+.gl-setPreviewHead{font-size:12px;font-weight:600;color:var(--dsw-alias-label-secondary);padding:8px 12px;border-bottom:1px solid var(--dsw-alias-border-l1)}
+.gl-setPreviewBody{margin:0;padding:12px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px;line-height:1.62;white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-primary);overflow:auto;flex:1;min-height:180px}
+.gl-page[data-skin="night"] .gl-setPreview{background:var(--dsw-alias-bg-base)}
+@media (max-width:880px){.gl-setBody{grid-template-columns:minmax(0,1fr)}}
+
 .gl-reportControls{display:flex;flex-wrap:wrap;gap:10px 18px;padding:12px 18px;border-bottom:1px solid var(--dsw-alias-border-l1);align-items:flex-start;flex:none}
 .gl-controlGroup{display:flex;align-items:center;gap:8px;min-width:0}
 .gl-controlWide{flex-basis:100%}
@@ -758,9 +831,72 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------------
 
     const SKIN_STORAGE_KEY = 'dsh.ganleme.skin';
-    const REPORT_STYLE_KEY = 'dsh.ganleme.reportStyle';
-    const REPORT_LIMIT_KEY = 'dsh.ganleme.reportLimit';
-    const REPORT_NUMBERING_KEY = 'dsh.ganleme.reportNumbering';
+    /** One stored record holds the whole confirmed report format. */
+    const REPORT_CONFIG_KEY = 'dsh.ganleme.reportConfig';
+
+    const DEFAULT_REPORT_CONFIG = Object.freeze({
+      style: 'worklog',
+      numbering: null, // null follows the style's own default
+      limit: 20,
+      format: 'plain',
+      scope: 'mine',
+      overrides: {},
+    });
+
+    /** Migrate the pre-0.3 separate keys, then drop them. */
+    function readReportConfig() {
+      const raw = readStored(REPORT_CONFIG_KEY);
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed && REPORT_STYLES[parsed.style]) {
+            return { ...DEFAULT_REPORT_CONFIG, ...parsed, overrides: parsed.overrides ?? {} };
+          }
+        } catch {}
+      }
+      const legacyStyle = readStored('dsh.ganleme.reportStyle');
+      const legacyLimit = Number(readStored('dsh.ganleme.reportLimit'));
+      const legacyNumbering = readStored('dsh.ganleme.reportNumbering');
+      if (!legacyStyle && !legacyLimit && !legacyNumbering) return null;
+      const migrated = {
+        ...DEFAULT_REPORT_CONFIG,
+        ...(REPORT_STYLES[legacyStyle] ? { style: legacyStyle } : {}),
+        ...([0, 20, 50].includes(legacyLimit) ? { limit: legacyLimit } : {}),
+        ...(NUMBERING[legacyNumbering] ? { numbering: legacyNumbering } : {}),
+      };
+      writeReportConfig(migrated);
+      writeStored('dsh.ganleme.reportStyle', null);
+      writeStored('dsh.ganleme.reportLimit', null);
+      writeStored('dsh.ganleme.reportNumbering', null);
+      return migrated;
+    }
+
+    function writeReportConfig(config) {
+      writeStored(REPORT_CONFIG_KEY, JSON.stringify(config));
+    }
+
+    /** Sample payload behind the settings preview; one repository, three commits. */
+    const PREVIEW_DATA = {
+      from: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()).toISOString(),
+      to: new Date(new Date().getFullYear(), new Date().getMonth(), new Date().getDate() + 1).toISOString(),
+      generatedAt: new Date().toISOString(),
+      totals: { commits: 3, insertions: 128, deletions: 24, files: 5, repos: 1, authors: [{ name: '张三', count: 3 }] },
+      mine: { commits: 3, insertions: 128, deletions: 24, files: 5, repos: 1, authors: [{ name: '张三', count: 3 }] },
+      repos: [{
+        key: 'preview',
+        title: 'my-project',
+        ok: true,
+        branch: 'main',
+        me: { email: 'me@example.com', emails: ['me@example.com'], name: '张三' },
+        stats: { commits: 3, insertions: 128, deletions: 24, files: 5, authors: [{ name: '张三', count: 3 }] },
+        mine: { commits: 3, insertions: 128, deletions: 24, files: 5, authors: [{ name: '张三', count: 3 }] },
+        commits: [
+          { hash: 'a1b2c3d', author: '张三', email: 'me@example.com', subject: 'fix: 修复登录状态丢失的问题', time: new Date(new Date().setHours(15, 40)).toISOString(), mine: true, insertions: 42, deletions: 8, files: 2, paths: [] },
+          { hash: 'e4f5g6h', author: '张三', email: 'me@example.com', subject: 'feat: 支持按仓库筛选', time: new Date(new Date().setHours(11, 5)).toISOString(), mine: true, insertions: 76, deletions: 16, files: 3, paths: [] },
+          { hash: 'i7j8k9l', author: '张三', email: 'me@example.com', subject: 'perf: 优化统计加载速度', time: new Date(new Date().setHours(9, 30)).toISOString(), mine: true, insertions: 10, deletions: 0, files: 1, paths: [] },
+        ],
+      }],
+    };
     const BG_STORAGE_KEY = 'dsh.ganleme.bg';
     const BG_DAILY_KEY = 'dsh.ganleme.bgDaily';
     /** Folder imports land in IndexedDB: localStorage cannot hold a whole album. */
@@ -1040,6 +1176,18 @@ window.__ModuleLoader__.load({
         Object.entries(overrides).filter(([key, value]) => REPORT_CHOICES.includes(key) && value !== undefined),
       ),
     });
+
+    /**
+     * Decide what a generate click does, given whether a format is confirmed
+     * and whether a sheet is already open. Pure, so the first-run rules can be
+     * tested without a browser.
+     * @returns { action: 'generate' | 'ask', retarget: boolean }
+     */
+    function reportIntent({ hasConfig, sheetOpen }) {
+      if (!hasConfig) return { action: 'ask', retarget: true };
+      // A sheet left open is discarded on a confirmed generate.
+      return { action: 'generate', retarget: false };
+    }
 
     /**
      * Render the report from one stats payload.
@@ -1357,21 +1505,8 @@ window.__ModuleLoader__.load({
       return ref;
     }
 
-    function ReportModal({
-      report, scope, onScope, format, onFormat, onClose, onCopy, copied, t,
-      style, onStyle, overrides, onToggle, numbering, onNumbering, limit, onLimit,
-    }) {
+    function ReportModal({ report, onClose, onCopy, copied, onSettings, t }) {
       const dialogRef = useDialogFocus();
-      const spec = resolveReportSpec(style, { ...overrides, numbering });
-      const plainFormat = format === 'plain';
-      const disabled = !report.data;
-      const group = (label, children) =>
-        h(
-          'div',
-          { className: 'gl-controlGroup', role: 'group', 'aria-label': label },
-          h('span', { className: 'gl-controlLabel' }, label),
-          h('div', { className: 'gl-tabs' }, children),
-        );
       return h(
         'div',
         {
@@ -1382,127 +1517,15 @@ window.__ModuleLoader__.load({
         },
         h(
           'div',
-          { ref: dialogRef, tabIndex: -1, className: 'gl-modal gl-modalWide', role: 'dialog', 'aria-modal': true, 'aria-label': t('report.title.' + report.kind) },
+          { ref: dialogRef, tabIndex: -1, className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('report.title.' + report.kind) },
           h(
             'div',
             { className: 'gl-modalHead' },
             h('h2', { className: 'gl-modalTitle' }, t('report.title.' + report.kind)),
             report.data ? h('span', { className: 'gl-modalRange' }, windowLabel(report.data)) : null,
             h('span', { style: { marginLeft: 'auto' } }),
+            h('button', { className: 'gl-iconBtn', 'aria-label': t('report.settings'), title: t('report.settings'), onClick: onSettings }, h(GearIcon)),
             h('button', { className: 'gl-btn', onClick: onClose }, t('report.close')),
-          ),
-          h(
-            'div',
-            { className: 'gl-reportControls' },
-            group(
-              t('report.style'),
-              REPORT_STYLE_ORDER.map((id) =>
-                h(
-                  'button',
-                  {
-                    key: id,
-                    className: 'gl-tab',
-                    'aria-pressed': style === id,
-                    'data-active': style === id,
-                    title: t('report.style.' + id + '.hint'),
-                    disabled,
-                    onClick: () => onStyle(id),
-                  },
-                  t('report.style.' + id),
-                ),
-              ),
-            ),
-            group(
-              t('scope.all'),
-              ['mine', 'all'].map((id) =>
-                h(
-                  'button',
-                  {
-                    key: id,
-                    className: 'gl-tab',
-                    'aria-pressed': scope === id,
-                    'data-active': scope === id,
-                    disabled,
-                    onClick: () => onScope(id),
-                  },
-                  t('scope.' + id),
-                ),
-              ),
-            ),
-            group(
-              t('report.format.markdown'),
-              ['plain', 'markdown'].map((id) =>
-                h(
-                  'button',
-                  {
-                    key: id,
-                    className: 'gl-tab',
-                    'aria-pressed': format === id,
-                    'data-active': format === id,
-                    disabled,
-                    onClick: () => onFormat(id),
-                  },
-                  t('report.format.' + id),
-                ),
-              ),
-            ),
-            group(
-              t('report.limit'),
-              [20, 50, 0].map((n) =>
-                h(
-                  'button',
-                  {
-                    key: n,
-                    className: 'gl-tab',
-                    'aria-pressed': limit === n,
-                    'data-active': limit === n,
-                    disabled,
-                    onClick: () => onLimit(n),
-                  },
-                  n === 0 ? t('report.limit.all') : fmt(t('report.limit.n'), { n }),
-                ),
-              ),
-            ),
-            group(
-              t('report.numbering'),
-              NUMBERING_ORDER.map((id) =>
-                h(
-                  'button',
-                  {
-                    key: id,
-                    className: 'gl-tab',
-                    'aria-pressed': spec.numbering === id,
-                    'data-active': spec.numbering === id,
-                    disabled: !plainFormat,
-                    title: plainFormat ? undefined : t('report.numbering.markdownOnly'),
-                    onClick: () => onNumbering(id),
-                  },
-                  t('report.numbering.' + id),
-                ),
-              ),
-            ),
-            h(
-              'div',
-              { className: 'gl-controlGroup gl-controlWide', role: 'group', 'aria-label': t('report.advanced') },
-              h('span', { className: 'gl-controlLabel' }, t('report.advanced')),
-              h(
-                'div',
-                { className: 'gl-toggleRow' },
-                REPORT_TOGGLES.map((key) =>
-                  h(
-                    'label',
-                    { key, className: 'gl-check', title: t('report.toggle.' + key + '.hint') },
-                    h('input', {
-                      type: 'checkbox',
-                      checked: !!spec[key],
-                      disabled,
-                      onChange: (e) => onToggle(key, e.target.checked),
-                    }),
-                    h('span', null, t('report.toggle.' + key)),
-                  ),
-                ),
-              ),
-            ),
           ),
           report.error
             ? h('div', { className: 'gl-pre' }, `${t('report.failed')}: ${report.error}`)
@@ -1516,6 +1539,191 @@ window.__ModuleLoader__.load({
               copied ? t('report.copied') : t('report.copy'),
             ),
             h('button', { className: 'gl-btn', onClick: onClose }, t('report.close')),
+          ),
+        ),
+      );
+    }
+
+    /** Gear glyph: opens the report format settings. */
+    function GearIcon() {
+      return h(
+        'svg',
+        { width: 16, height: 16, viewBox: '0 0 24 24', fill: 'none', 'aria-hidden': true },
+        h('circle', { cx: 12, cy: 12, r: 3.1, stroke: 'currentColor', 'stroke-width': 1.9 }),
+        h('path', {
+          d: 'M19.4 13.5a7.6 7.6 0 0 0 0-3l1.6-1.2-1.9-3.3-1.9.8a7.5 7.5 0 0 0-2.6-1.5L14.3 3h-3.8l-.3 2.3a7.5 7.5 0 0 0-2.6 1.5l-1.9-.8L3.8 9.3L5.4 10.5a7.6 7.6 0 0 0 0 3L3.8 14.7l1.9 3.3 1.9-.8a7.5 7.5 0 0 0 2.6 1.5l.3 2.3h3.8l.3-2.3a7.5 7.5 0 0 0 2.6-1.5l1.9.8 1.9-3.3-1.6-1.2Z',
+          stroke: 'currentColor',
+          'stroke-width': 1.7,
+          'stroke-linejoin': 'round',
+        }),
+      );
+    }
+
+    /**
+     * Report format settings: a full sheet of grouped choices with a live
+     * preview. It opens on the first generate (nothing saved yet) and any time
+     * the gear in the report window is pressed; saving persists every choice.
+     */
+    function ReportSettings({
+      draft, onDraft, preview, firstRun, onSave, onCancel, t,
+    }) {
+      const dialogRef = useDialogFocus();
+      const choice = (key, id, label, hint) =>
+        h(
+          'button',
+          {
+            key: id,
+            className: 'gl-choice',
+            'aria-pressed': draft[key] === id,
+            'data-active': draft[key] === id,
+            title: hint,
+            onClick: () => onDraft({ ...draft, [key]: id }),
+          },
+          label,
+        );
+      const section = (title, hint, children) =>
+        h(
+          'section',
+          { className: 'gl-setSection' },
+          h('div', { className: 'gl-setHead' },
+            h('h3', { className: 'gl-setTitle' }, title),
+            hint ? h('p', { className: 'gl-setHint' }, hint) : null),
+          children,
+        );
+      return h(
+        'div',
+        {
+          className: 'gl-backdrop',
+          onMouseDown: (e) => {
+            if (e.target === e.currentTarget) onCancel();
+          },
+        },
+        h(
+          'div',
+          {
+            ref: dialogRef,
+            tabIndex: -1,
+            className: 'gl-modal gl-modalWide',
+            role: 'dialog',
+            'aria-modal': true,
+            'aria-label': t('report.firstRun.title'),
+          },
+          h(
+            'div',
+            { className: 'gl-modalHead' },
+            h('h2', { className: 'gl-modalTitle' }, t(firstRun ? 'report.firstRun.title' : 'report.settings')),
+            firstRun ? h('span', { className: 'gl-chip' }, t('report.firstRun.badge')) : null,
+            h('span', { style: { marginLeft: 'auto' } }),
+            h('button', { className: 'gl-btn', onClick: onCancel }, t('report.firstRun.cancel')),
+          ),
+          h(
+            'div',
+            { className: 'gl-setBody' },
+            h(
+              'div',
+              { className: 'gl-setForm' },
+              firstRun ? h('p', { className: 'gl-setIntro' }, t('report.firstRun.intro')) : null,
+              section(
+                t('report.style'),
+                t('report.styleHint'),
+                h(
+                  'div',
+                  { className: 'gl-choiceGrid' },
+                  REPORT_STYLE_ORDER.map((id) =>
+                    h(
+                      'button',
+                      {
+                        key: id,
+                        className: 'gl-styleCard',
+                        'aria-pressed': draft.style === id,
+                        'data-active': draft.style === id,
+                        onClick: () => onDraft({ ...draft, style: id }),
+                      },
+                      h('span', { className: 'gl-styleName' }, t('report.style.' + id)),
+                      h('span', { className: 'gl-styleHint' }, t('report.style.' + id + '.hint')),
+                    ),
+                  ),
+                ),
+              ),
+              section(
+                t('report.numbering'),
+                t('report.numberingHint'),
+                h(
+                  'div',
+                  { className: 'gl-choiceGrid gl-choiceGridTight' },
+                  NUMBERING_ORDER.map((id) =>
+                    choice('numbering', id, t('report.numbering.' + id), t('report.numbering.' + id + '.hint')),
+                  ),
+                ),
+              ),
+              section(
+                t('report.limit'),
+                t('report.limitHint'),
+                h(
+                  'div',
+                  { className: 'gl-choiceGrid gl-choiceGridTight' },
+                  [20, 50, 0].map((n) => choice('limit', n, n === 0 ? t('report.limit.all') : fmt(t('report.limit.n'), { n }))),
+                ),
+              ),
+              section(
+                t('report.advanced'),
+                t('report.advancedHint'),
+                h(
+                  'div',
+                  { className: 'gl-toggleRow' },
+                  REPORT_TOGGLES.map((key) =>
+                    h(
+                      'label',
+                      { key, className: 'gl-check', title: t('report.toggle.' + key + '.hint') },
+                      h('input', {
+                        type: 'checkbox',
+                        checked: !!draft.overrides[key],
+                        onChange: (e) => onDraft({ ...draft, overrides: { ...draft.overrides, [key]: e.target.checked } }),
+                      }),
+                      h('span', null, t('report.toggle.' + key)),
+                    ),
+                  ),
+                ),
+              ),
+              section(
+                t('report.format.markdown'),
+                t('report.formatHint'),
+                h(
+                  'div',
+                  { className: 'gl-choiceGrid gl-choiceGridTight' },
+                  ['plain', 'markdown'].map((id) => choice('format', id, t('report.format.' + id), t('report.format.' + id + '.hint'))),
+                ),
+              ),
+              section(
+                t('scope.all'),
+                t('report.scopeHint'),
+                h(
+                  'div',
+                  { className: 'gl-choiceGrid gl-choiceGridTight' },
+                  ['mine', 'all'].map((id) => choice('scope', id, t('scope.' + id), t('scope.' + id + '.hint'))),
+                ),
+              ),
+            ),
+            h(
+              'aside',
+              { className: 'gl-setPreview' },
+              h('div', { className: 'gl-setPreviewHead' }, t('report.preview')),
+              h('pre', { className: 'gl-setPreviewBody' }, preview),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'gl-modalFoot' },
+            h(
+              'button',
+              { className: 'gl-btn', onClick: onCancel },
+              t('report.firstRun.cancel'),
+            ),
+            h(
+              'button',
+              { className: 'gl-btn gl-btnPrimary', onClick: onSave },
+              t(firstRun ? 'report.firstRun.save' : 'report.settings.save'),
+            ),
           ),
         ),
       );
@@ -1746,21 +1954,12 @@ window.__ModuleLoader__.load({
           ? `ganleme/stats?range=custom&from=${encodeURIComponent(customRange.from)}&to=${encodeURIComponent(customRange.to)}`
           : `ganleme/stats?range=${range}`;
       const [scope, setScope] = React.useState('all');
-      const [reportScope, setReportScope] = React.useState('mine');
-      const [reportFormat, setReportFormat] = React.useState('plain');
-      const [reportStyle, setReportStyle] = React.useState(() => {
-        const stored = readStored(REPORT_STYLE_KEY);
-        return REPORT_STYLES[stored] ? stored : 'worklog';
-      });
-      const [reportOverrides, setReportOverrides] = React.useState({});
-      const [reportNumbering, setReportNumbering] = React.useState(() => {
-        const stored = readStored(REPORT_NUMBERING_KEY);
-        return NUMBERING[stored] ? stored : null; // null = follow the style
-      });
-      const [reportLimit, setReportLimit] = React.useState(() => {
-        const stored = Number(readStored(REPORT_LIMIT_KEY));
-        return [0, 20, 50].includes(stored) ? stored : 20;
-      });
+      /** Saved report format, or null until the user confirms it once. */
+      const [reportConfig, setReportConfig] = React.useState(readReportConfig);
+      /** Unsaved edits inside the settings sheet. */
+      const [draftConfig, setDraftConfig] = React.useState(null);
+      /** Pending report request waiting for the format to be confirmed. */
+      const pendingReportRef = React.useRef(null);
       const [skin, setSkin] = React.useState(() => readStored(SKIN_STORAGE_KEY) ?? 'default');
       const [skinOpen, setSkinOpen] = React.useState(false);
       const [dailyRandom, setDailyRandom] = React.useState(() => readStored(BG_DAILY_KEY) === '1');
@@ -2175,43 +2374,51 @@ window.__ModuleLoader__.load({
       };
 
       /**
-       * Re-render the open report from its cached payload. `next` carries the
-       * option being changed, so the text always reflects every current toggle.
+       * Build one report. `entry` names the range; the saved format supplies
+       * every other choice, so a second report reuses what was confirmed once.
        */
-      const rerenderReport = (prev, next) => {
-        if (!prev || !prev.data) return prev;
-        const options = {
-          style: next.style ?? reportStyle,
-          overrides: next.overrides ?? reportOverrides,
-          numbering: next.numbering !== undefined ? next.numbering : reportNumbering,
-          limit: next.limit ?? reportLimit,
-        };
-        const opts = { style: options.style, overrides: options.overrides, numbering: options.numbering, limit: options.limit };
-        return { ...prev, text: buildReport(t, prev.kind, prev.data, next.scope ?? reportScope, next.format ?? reportFormat, opts) };
-      };
-
-      const generateReport = (entry) => {
-        // Reports default to the caller's own commits; the modal can widen the
-        // scope, pick a style, flip toggles, change format, or cap the count.
-        // entry.key/url override the preset range (used by the custom range report).
+      const runReport = (entry, config) => {
         const key = entry.cacheKey ?? entry.range;
         const url = entry.url ?? `ganleme/stats?range=${entry.range}`;
+        const options = {
+          style: config.style,
+          overrides: config.overrides,
+          numbering: config.numbering,
+          limit: config.limit,
+        };
+        const show = (data) => setReport({
+          kind: entry.kind,
+          data,
+          text: buildReport(t, entry.kind, data, config.scope, config.format, options),
+        });
         const cached = cacheRef.current.get(key);
-        setReportScope('mine');
-        const options = { style: reportStyle, overrides: reportOverrides, numbering: reportNumbering, limit: reportLimit };
         if (cached) {
-          setReport({ kind: entry.kind, data: cached, text: buildReport(t, entry.kind, cached, 'mine', reportFormat, options) });
+          show(cached);
           return;
         }
         setReport({ kind: entry.kind });
         fetchJson(url)
           .then((data) => {
             cacheRef.current.set(key, data);
-            setReport({ kind: entry.kind, data, text: buildReport(t, entry.kind, data, 'mine', reportFormat, options) });
+            show(data);
           })
-          .catch((error) => {
-            setReport({ kind: entry.kind, error: String(error?.message ?? error) });
-          });
+          .catch((error) => setReport({ kind: entry.kind, error: String(error?.message ?? error) }));
+      };
+
+      const generateReport = (entry) => {
+        // First use asks for the format before generating; later runs reuse it.
+        const intent = reportIntent({ hasConfig: !!reportConfig, sheetOpen: !!draftConfig });
+        if (intent.action === 'ask') {
+          // Already configuring (perhaps a different range): keep the edits the
+          // user has made and simply retarget the report that follows saving.
+          pendingReportRef.current = entry;
+          setDraftConfig((current) => current ?? { ...DEFAULT_REPORT_CONFIG });
+          setReport(null);
+          return;
+        }
+        // A settings sheet left open from an earlier visit is closed on generate.
+        setDraftConfig(null);
+        runReport(entry, reportConfig);
       };
 
       const generateCustomReport = () => {
@@ -2219,41 +2426,48 @@ window.__ModuleLoader__.load({
         generateReport({ kind: 'range', cacheKey: statsKey, url: statsUrl });
       };
 
-      const changeReportScope = (next) => {
-        setReportScope(next);
-        setReport((prev) => rerenderReport(prev, { scope: next }));
-      };
-
-      const changeReportFormat = (next) => {
-        setReportFormat(next);
-        setReport((prev) => rerenderReport(prev, { format: next }));
-      };
-
-      const changeReportStyle = (next) => {
-        setReportStyle(next);
-        writeStored(REPORT_STYLE_KEY, next);
-        setReport((prev) => rerenderReport(prev, { style: next }));
-      };
-
-      const changeReportToggle = (key, on) => {
-        setReportOverrides((prev) => {
-          const next = { ...prev, [key]: on };
-          setReport((current) => rerenderReport(current, { overrides: next }));
-          return next;
+      /** Confirm the format: persist it, then generate whatever was waiting. */
+      const saveReportConfig = () => {
+        const draft = draftConfig ?? reportConfig;
+        if (!draft) return;
+        const next = { ...DEFAULT_REPORT_CONFIG, ...draft };
+        writeReportConfig(next);
+        setReportConfig(next);
+        setDraftConfig(null);
+        const pending = pendingReportRef.current;
+        pendingReportRef.current = null;
+        if (pending) {
+          runReport(pending, next);
+          return;
+        }
+        // Re-render an open report in place with the new format.
+        setReport((prev) => {
+          if (!prev || !prev.data) return prev;
+          const options = { style: next.style, overrides: next.overrides, numbering: next.numbering, limit: next.limit };
+          return { ...prev, text: buildReport(t, prev.kind, prev.data, next.scope, next.format, options) };
         });
       };
 
-      const changeReportNumbering = (next) => {
-        setReportNumbering(next);
-        writeStored(REPORT_NUMBERING_KEY, next);
-        setReport((prev) => rerenderReport(prev, { numbering: next }));
+      const cancelReportSettings = () => {
+        // Abandoning the sheet drops the pending report and the edits: the next
+        // generate asks again rather than generating in an unconfirmed format.
+        pendingReportRef.current = null;
+        setDraftConfig(null);
       };
 
-      const changeReportLimit = (next) => {
-        setReportLimit(next);
-        writeStored(REPORT_LIMIT_KEY, String(next));
-        setReport((prev) => rerenderReport(prev, { limit: next }));
+      const openReportSettings = () => {
+        // The gear edits the saved format; it never retargets a pending report.
+        pendingReportRef.current = null;
+        setDraftConfig((current) => current ?? { ...(reportConfig ?? DEFAULT_REPORT_CONFIG) });
       };
+
+      /** Live preview for the settings sheet, built from a tiny sample. */
+      const settingsPreview = draftConfig ? buildReport(t, 'daily', PREVIEW_DATA, draftConfig.scope, draftConfig.format, {
+        style: draftConfig.style,
+        overrides: draftConfig.overrides,
+        numbering: draftConfig.numbering,
+        limit: draftConfig.limit,
+      }) : '';
 
       const copyReport = () => {
         const text = report?.text;
@@ -2391,6 +2605,16 @@ window.__ModuleLoader__.load({
                   t(resolved.key),
                 );
               }),
+              h(
+                'button',
+                {
+                  className: 'gl-iconBtn',
+                  'aria-label': t('report.settings'),
+                  title: t('report.settings'),
+                  onClick: openReportSettings,
+                },
+                h(GearIcon),
+              ),
             ),
           ),
           range === 'custom'
@@ -2494,22 +2718,22 @@ window.__ModuleLoader__.load({
           report
             ? h(ReportModal, {
                 report,
-                scope: reportScope,
-                onScope: changeReportScope,
-                format: reportFormat,
-                onFormat: changeReportFormat,
-                style: reportStyle,
-                onStyle: changeReportStyle,
-                overrides: reportOverrides,
-                onToggle: changeReportToggle,
-                numbering: reportNumbering,
-                onNumbering: changeReportNumbering,
-                limit: reportLimit,
-                onLimit: changeReportLimit,
                 t,
                 copied,
                 onCopy: copyReport,
+                onSettings: openReportSettings,
                 onClose: () => setReport(null),
+              })
+            : null,
+          draftConfig
+            ? h(ReportSettings, {
+                draft: draftConfig,
+                onDraft: setDraftConfig,
+                preview: settingsPreview,
+                firstRun: !reportConfig,
+                onSave: saveReportConfig,
+                onCancel: cancelReportSettings,
+                t,
               })
             : null,
           skinOpen
@@ -2579,8 +2803,14 @@ window.__ModuleLoader__.load({
         NUMBERING,
         NUMBERING_ORDER,
         formatCommitLine,
+        reportIntent,
         ReportModal,
+        ReportSettings,
         DashboardPage,
+        readReportConfig,
+        writeReportConfig,
+        DEFAULT_REPORT_CONFIG,
+        PREVIEW_DATA,
         COMMIT_TYPES,
         loadManualBg,
         manualBgSet,
