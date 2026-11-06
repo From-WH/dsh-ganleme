@@ -43,6 +43,13 @@ test('meta reports the package.json version', async () => {
   assert.equal((await call('/ganleme/meta')).json.version, VERSION);
 });
 
+test('without pluginManager, update is unavailable instead of failing later', async () => {
+  const { call } = await makeHost();
+  assert.equal((await call('/ganleme/meta')).json.update, null);
+  assert.equal((await call('/ganleme/update')).status, 501);
+  assert.equal((await call('/ganleme/update/install', { method: 'POST' })).status, 501);
+});
+
 test('check: detects a newer version on the configured registry', async () => {
   const reg = stubRegistry(bump(VERSION));
   try {

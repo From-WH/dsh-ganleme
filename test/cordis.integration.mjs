@@ -76,6 +76,29 @@ test('activates with only the core services', { skip }, async () => {
   assert.equal((await request(routes, '/ganleme/roots/pick', 'POST')).status, 501);
 });
 
+test('optional services may arrive after the plugin and may go away', { skip }, async () => {
+  const { Service } = cordis;
+  const host = await loadHost();
+  const { root, routes } = makeRoot(CORE);
+  root.plugin(host, {});
+  await settle();
+  assert.equal((await request(routes, '/ganleme/meta')).json.update, null);
+  class LateManager extends Service {
+    constructor(ctx) {
+      super(ctx, 'pluginManager');
+    }
+    listBundles() {
+      return [];
+    }
+  }
+  const fiber = root.plugin(LateManager);
+  await settle();
+  assert.ok((await request(routes, '/ganleme/meta')).json.update, 'picked up a late pluginManager');
+  await fiber.dispose();
+  await settle();
+  assert.equal((await request(routes, '/ganleme/meta')).json.update, null, 'dropped a removed pluginManager');
+});
+
 test('self-update reaches pluginManager through the real dependency guard', { skip }, async () => {
   const realFetch = globalThis.fetch;
   globalThis.fetch = async () => ({ ok: true, json: async () => ({ 'dist-tags': { latest: '99.0.0' } }) });

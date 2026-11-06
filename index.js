@@ -27,7 +27,18 @@ import z from './vendor/schemastery.mjs';
 export const name = 'ganleme';
 
 /** The route carrier, the trust fence, the workspace registry, and the PATH resolver. */
-export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess', 'configEditor', 'directoryPickerController'];
+/**
+ * Required services only: statistics need nothing else. The plugin manager,
+ * config editor and directory picker are optional and are captured through
+ * `ctx.inject` sub-plugins in `apply`, so a deployment without them still runs
+ * the dashboard and only the dependent feature reports itself unavailable.
+ * (A name listed here is required; Cordis keeps the whole plugin inactive
+ * until every one exists, and denies access to any name not listed.)
+ */
+export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess'];
+
+/** Optional services, captured on demand; see `captureOptional` in apply(). */
+const OPTIONAL_SERVICES = ['pluginManager', 'configEditor', 'directoryPickerController'];
 
 export const Config = z.object({
   /** Additional directories scanned for git repositories (see scanDepth). */
@@ -489,6 +500,27 @@ async function fetchLatestVersion(pkg, registry) {
 // ---------------------------------------------------------------------------
 
 export function apply(ctx, config) {
+  /**
+   * Live references to optional services. Each one is captured by a
+   * sub-plugin that Cordis activates only while that service exists, and
+   * cleared when it goes away; routes read `optional.X` and answer 501 when
+   * it is absent instead of throwing through the dependency guard.
+   */
+  const optional = Object.create(null);
+  for (const name of OPTIONAL_SERVICES) {
+    ctx.inject([name], (sub) => {
+      sub.effect(() => {
+        // Read once: by cleanup time the service may already be gone, and
+        // touching `sub[name]` then would throw through the dependency guard.
+        const value = sub[name];
+        optional[name] = value;
+        return () => {
+          if (optional[name] === value) delete optional[name];
+        };
+      }, `ganleme: optional ${name}`);
+    });
+  }
+
   const resolvedGit = (() => {
     let promise = null;
     return () => {
@@ -645,20 +677,21 @@ export function apply(ctx, config) {
 
   let updating = false;
 
+  /** Update settings, or null when updates are off or no plugin manager runs here. */
   const updateConfigOf = () => {
     const pkg = String(config.updatePackage ?? '').trim();
-    if (!pkg) return null;
+    const manager = optional.pluginManager;
+    if (!pkg || !manager) return null;
     const registry = String(config.updateRegistry ?? '').trim() || 'https://registry.npmjs.org/';
-    return { pkg, registry };
+    return { pkg, registry, manager };
   };
 
-  const performUpdate = async (pkg, latest) => {
+  /**
+   * Reinstall `pkg@latest`. `manager` is captured by the caller before the
+   * removal disposes this plugin, which also clears `optional.pluginManager`.
+   */
+  const performUpdate = async (manager, pkg, latest) => {
     try {
-      const manager = ctx.pluginManager;
-      if (!manager || typeof manager.removeBundle !== 'function' || typeof manager.installBundle !== 'function') {
-        console.error('[ganleme] update aborted: the pluginManager service is unavailable in this deployment');
-        return;
-      }
       console.info(`[ganleme] updating ${pkg} -> ${latest}: removing the installed bundle first`);
       await manager.removeBundle(pkg);
       const result = await manager.installBundle(`${pkg}@${latest}`);
@@ -745,7 +778,7 @@ export function apply(ctx, config) {
             }
             updating = true;
             sendJson(res, 202, { started: true, pkg: update.pkg, from: current, to: latest });
-            void performUpdate(update.pkg, latest);
+            void performUpdate(update.manager, update.pkg, latest);
           } catch (error) {
             sendJson(res, 502, { code: 'registry-unreachable', message: String(error?.message ?? error) });
           }
@@ -782,7 +815,7 @@ export function apply(ctx, config) {
   };
 
   const updateExtraRoots = async (mutate) => {
-    const editor = ctx.configEditor;
+    const editor = optional.configEditor;
     if (!editor || typeof editor.edit !== 'function' || typeof editor.entries !== 'function') {
       throw new Error('configEditor service unavailable in this deployment');
     }
@@ -872,12 +905,7 @@ export function apply(ctx, config) {
         handler: async (req, res) => {
           if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
-          let picker;
-          try {
-            picker = ctx.directoryPickerController;
-          } catch {
-            picker = undefined;
-          }
+          const picker = optional.directoryPickerController;
           if (!picker || typeof picker.pick !== 'function') {
             sendJson(res, 501, { code: 'picker-unavailable', message: 'directory picker is not available in this deployment' });
             return;
