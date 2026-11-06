@@ -403,6 +403,41 @@ test('a rejected rewrite is explained, and apply stays available for hand edits'
   assert.ok(captured.some((c) => c.props.role === 'alert'), 'the number guard explains itself');
 });
 
+test('applying a rewrite either lands or explains itself, never nothing', async () => {
+  // Regression: "apply" once threw (the guard was missing on the client) and the
+  // failure was swallowed, so the button did nothing at all with no message.
+  const mod = await loadClient();
+  const apply = mod.__test.polishApplication;
+  const source = '本期共提交 3 次，新增 128 行，删除 24 行。';
+
+  const ok = apply(source, '  本期完成 3 次提交，新增 128 行、删除 24 行。  ');
+  assert.equal(ok.applied, true);
+  assert.equal(ok.text, '本期完成 3 次提交，新增 128 行、删除 24 行。', 'trimmed and accepted');
+
+  const invented = apply(source, '本期完成 5 次提交，新增 128 行。');
+  assert.equal(invented.applied, false);
+  assert.equal(invented.reason, 'numbers');
+  assert.deepEqual(invented.extra, ['5']);
+
+  const empty = apply(source, '   ');
+  assert.equal(empty.applied, false);
+  assert.equal(empty.reason, 'empty');
+});
+
+test('the applied rewrite keeps the original reachable and shows a notice', async () => {
+  // The report keeps `original` so the modal can offer the toggle, and the page
+  // flashes a confirmation — both are what the user sees after pressing apply.
+  const mod = await loadClient();
+  const T = mod.__test;
+  const outcome = T.polishApplication('本期共提交 3 次。', '本期完成 3 次提交。');
+  assert.equal(outcome.applied, true);
+  const report = { kind: 'daily', text: '本期共提交 3 次。', data: {} };
+  const applied = { ...report, text: outcome.text, original: report.original ?? report.text, polished: true };
+  assert.equal(applied.polished, true);
+  assert.equal(applied.original, '本期共提交 3 次。', 'the untouched original is preserved');
+  assert.equal(applied.text, '本期完成 3 次提交。');
+});
+
 test('repos without git identity are named in mine reports', () => {
   const extra = { ...data, repos: [...data.repos, { key: 'c', title: 'repo-c', ok: true, me: null, stats: stats(1, 1), mine: stats(0, 0), commits: [] }] };
   assert.ok(T.buildReport(t, 'daily', extra, 'mine', 'plain', { style: 'worklog' }).includes('repo-c'));

@@ -231,3 +231,36 @@ test('meta advertises polish only when the Host can do it', async () => {
   assert.equal((await makeHost({ services: { llm } }).then((h) => h.call('/ganleme/meta'))).json.polish, true);
   assert.equal((await makeHost().then((h) => h.call('/ganleme/meta'))).json.polish, false);
 });
+
+test('the browser and the Host agree on every number verdict', async () => {
+  // The client keeps its own copy of the guard so a hand edit is checked where
+  // it happens. This test fails if the two implementations ever drift.
+  const { loadClient } = await import('./helpers.mjs');
+  const client = await loadClient();
+  const clientGuard = client.__test.checkPolishNumbers;
+  assert.equal(typeof clientGuard, 'function', 'the client exposes the guard');
+  const originals = [
+    TEXT,
+    '日报 · 2026-11-05\n\n本期共提交 3 次，新增 128 行，删除 24 行，涉及 1 个仓库。',
+    '没有数字的报告',
+    '',
+  ];
+  const candidates = [
+    TEXT,
+    '本期完成 3 次提交，新增 128 行。',
+    '本期完成 9 次提交。',
+    '本期完成 3 次提交，涉及 2 个仓库。',
+    '完全没有数字',
+    '新增 0.5 行',
+    '2026-11-05 完成 3 次提交',
+  ];
+  for (const original of originals) {
+    for (const candidate of candidates) {
+      assert.deepEqual(
+        clientGuard(original, candidate),
+        checkPolishNumbers(original, candidate),
+        `disagreement for ${JSON.stringify({ original, candidate })}`,
+      );
+    }
+  }
+});

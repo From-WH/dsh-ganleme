@@ -144,6 +144,9 @@ window.__ModuleLoader__.load({
       'polish.streaming': '生成中',
       'polish.failed': '润色失败：{message}',
       'polish.numbersChanged': '润色结果出现了原文没有的数字（{extra}），已拒绝应用。可以手动改掉后重试。',
+      'polish.emptyResult': '润色结果是空的，无法应用',
+      'polish.applied': '已应用润色结果',
+      'polish.appliedHint': '窗口顶部可切回原文',
       'report.view.polished': '润色后',
       'report.view.original': '原文',
 
@@ -347,6 +350,9 @@ window.__ModuleLoader__.load({
       'polish.streaming': 'Generating',
       'polish.failed': 'Polish failed: {message}',
       'polish.numbersChanged': 'The rewrite introduced numbers the original does not have ({extra}); it was not applied. Edit them out and try again.',
+      'polish.emptyResult': 'The result is empty and cannot be applied',
+      'polish.applied': 'Polished text applied',
+      'polish.appliedHint': 'Switch back to the original at the top',
       'report.view.polished': 'Polished',
       'report.view.original': 'Original',
 
@@ -685,6 +691,7 @@ window.__ModuleLoader__.load({
 .gl-cardHead{display:flex;align-items:baseline;gap:10px;padding:12px 16px 4px;cursor:pointer;flex-wrap:wrap}
 .gl-repo{font-size:14px;font-weight:600}
 .gl-chip{font-size:11px;line-height:16px;padding:1px 8px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);color:var(--dsw-alias-label-secondary);background:var(--dsw-alias-bg-layer-2)}
+.gl-chipOk{border-color:var(--dsw-alias-state-success-primary);color:var(--dsw-alias-state-success-primary);background:transparent}
 .gl-chipWarn{border-color:var(--dsw-alias-state-warn-primary);color:var(--dsw-alias-state-warn-primary);background:transparent}
 .gl-cardPath{font-size:12px;color:var(--dsw-alias-label-secondary);padding:0 16px 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gl-cardStats{display:flex;align-items:center;gap:14px;margin-left:auto;font-size:13px;font-variant-numeric:tabular-nums;white-space:nowrap}
@@ -905,11 +912,44 @@ window.__ModuleLoader__.load({
     const POLISH_TONES = ['plain', 'report', 'natural'];
 
     /**
+     * Number guard, duplicated from the Host on purpose: the policy that may
+     * not be silently skipped must also run here, since the browser is where
+     * the hand-edited text exists. Kept in sync with index.js (see the test
+     * that asserts both implementations agree on every sample).
+     */
+    const extractNumbers = (text) => new Set(String(text ?? '').match(/\d+(?:\.\d+)?/gu) ?? []);
+
+    /**
+     * @returns `{ ok: true, extra: [] }`, or `{ ok: false, extra }` naming the
+     *   numbers the candidate introduced.
+     */
+    function checkPolishNumbers(original, candidate) {
+      const allowed = extractNumbers(original);
+      const extra = [...extractNumbers(candidate)].filter((n) => !allowed.has(n));
+      return extra.length === 0 ? { ok: true, extra: [] } : { ok: false, extra };
+    }
+
+    /**
      * Read the report text ready to polish, or null when the report is not
      * showing anything (still generating, failed, or empty).
      */
     function polishSource(report) {
       return report && typeof report.text === 'string' && report.text.trim() ? report.text : null;
+    }
+
+    /**
+     * Outcome of pressing "apply": either the report takes the rewrite, or the
+     * guard refuses and names the invented numbers. Pure so the button's two
+     * branches are testable without a browser (the guard itself once threw here
+     * because the client lacked it, leaving the button silently dead).
+     * @returns `{ applied: true, text }` or `{ applied: false, extra }`.
+     */
+    function polishApplication(source, candidate) {
+      const text = String(candidate ?? '').trim();
+      if (!text) return { applied: false, extra: [], reason: 'empty' };
+      const guard = checkPolishNumbers(source, text);
+      if (!guard.ok) return { applied: false, extra: guard.extra, reason: 'numbers' };
+      return { applied: true, text };
     }
 
     /** One stored record holds the whole confirmed report format. */
@@ -1603,7 +1643,7 @@ window.__ModuleLoader__.load({
       return ref;
     }
 
-    function ReportModal({ report, onClose, onCopy, copied, onSettings, onPolish, canPolish, showOriginal, onToggleOriginal, t }) {
+    function ReportModal({ report, onClose, onCopy, copied, onSettings, onPolish, canPolish, showOriginal, onToggleOriginal, notice, t }) {
       const dialogRef = useDialogFocus();
       return h(
         'div',
@@ -1621,6 +1661,7 @@ window.__ModuleLoader__.load({
             { className: 'gl-modalHead' },
             h('h2', { className: 'gl-modalTitle' }, t('report.title.' + report.kind)),
             report.data ? h('span', { className: 'gl-modalRange' }, windowLabel(report.data)) : null,
+            notice ? h('span', { className: 'gl-chip gl-chipOk' }, notice) : null,
             h('span', { style: { marginLeft: 'auto' } }),
             // Only offered once a rewrite exists: the original is never lost.
             report.polished
@@ -2233,6 +2274,9 @@ window.__ModuleLoader__.load({
       const [showOriginal, setShowOriginal] = React.useState(false);
       /** Whether the Host can polish at all (no llm service ⇒ no button). */
       const [canPolish, setCanPolish] = React.useState(false);
+      /** Transient confirmation shown beside the report header. */
+      const [polishNotice, setPolishNotice] = React.useState('');
+      const polishNoticeTimer = React.useRef(null);
       const [skin, setSkin] = React.useState(() => readStored(SKIN_STORAGE_KEY) ?? 'default');
       const [skinOpen, setSkinOpen] = React.useState(false);
       const [dailyRandom, setDailyRandom] = React.useState(() => readStored(BG_DAILY_KEY) === '1');
@@ -2335,6 +2379,7 @@ window.__ModuleLoader__.load({
           if (copyTimer.current) clearTimeout(copyTimer.current);
           if (skinMsgTimer.current) clearTimeout(skinMsgTimer.current);
           if (updateTimer.current) clearTimeout(updateTimer.current);
+          if (polishNoticeTimer.current) clearTimeout(polishNoticeTimer.current);
         },
         [],
       );
@@ -2851,16 +2896,31 @@ window.__ModuleLoader__.load({
       /** Apply the (possibly hand-edited) rewrite to the report on screen. */
       const applyPolish = () => {
         if (!polish) return;
-        const candidate = String(polish.output ?? '').trim();
-        if (!candidate) return;
-        // Guard runs again on the edited text: a manual edit is not trusted either.
-        const guard = checkPolishNumbers(polish.source, candidate);
-        if (guard.ok === false) {
-          setPolish((prev) => (prev ? { ...prev, error: fmt(t('polish.numbersChanged'), { extra: guard.extra.join(', ') }) } : prev));
+        const outcome = polishApplication(polish.source, polish.output);
+        if (!outcome.applied) {
+          // Never fail silently: the sheet stays open and says why.
+          setPolish((prev) => (prev
+            ? {
+                ...prev,
+                error: outcome.reason === 'numbers'
+                  ? fmt(t('polish.numbersChanged'), { extra: outcome.extra.join(', ') })
+                  : t('polish.emptyResult'),
+              }
+            : prev));
           return;
         }
-        setReport((prev) => (prev ? { ...prev, text: candidate, original: prev.original ?? prev.text, polished: true } : prev));
+        setReport((prev) => (prev ? { ...prev, text: outcome.text, original: prev.original ?? prev.text, polished: true } : prev));
+        // Show the rewrite so the user immediately sees what landed.
+        setShowOriginal(false);
         closePolish();
+        flashPolishNotice(t('polish.applied'));
+      };
+
+      /** Transient confirmation for polish actions. */
+      const flashPolishNotice = (text) => {
+        setPolishNotice(text);
+        if (polishNoticeTimer.current) clearTimeout(polishNoticeTimer.current);
+        polishNoticeTimer.current = setTimeout(() => setPolishNotice(''), 3000);
       };
 
       const copyReport = () => {
@@ -3120,6 +3180,7 @@ window.__ModuleLoader__.load({
                 canPolish,
                 showOriginal,
                 onToggleOriginal: setShowOriginal,
+                notice: polishNotice,
                 onClose: () => setReport(null),
               })
             : null,
@@ -3230,6 +3291,9 @@ window.__ModuleLoader__.load({
         POLISH_TONES,
         PolishSheet,
         polishSource,
+        checkPolishNumbers,
+        extractNumbers,
+        polishApplication,
         loadManualBg,
         manualBgSet,
         manualBgGet,
