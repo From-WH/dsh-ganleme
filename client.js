@@ -113,6 +113,7 @@ window.__ModuleLoader__.load({
       'skin.clearBg': '清除背景',
       'skin.clearPool': '清空背景库',
       'skin.uploadFailed': '背景图处理失败，请换一张试试',
+      'skin.saveFailed': '背景图保存失败（浏览器存储不可用或已满）',
       'quip.reroll': '点击换一句',
       'update.aria': '检查更新',
       'update.checking': '正在检查…',
@@ -229,6 +230,7 @@ window.__ModuleLoader__.load({
       'skin.clearBg': 'Remove background',
       'skin.clearPool': 'Clear library',
       'skin.uploadFailed': 'Could not process that image, try another one',
+      'skin.saveFailed': 'Could not save the background (browser storage unavailable or full)',
       'quip.reroll': 'Click for another one',
       'update.aria': 'Check for updates',
       'update.checking': 'Checking…',
@@ -689,6 +691,8 @@ window.__ModuleLoader__.load({
     /** Folder imports land in IndexedDB: localStorage cannot hold a whole album. */
     const BG_DB_NAME = 'ganleme';
     const BG_DB_STORE = 'bg';
+    /** The single uploaded background, kept apart from the folder library. */
+    const BG_MANUAL_STORE = 'manual';
     /** Upper bound for one folder import, keeping memory and import time sane. */
     const BG_POOL_CAP = 40;
     /** Veil layered over a user background image so content stays readable. */
@@ -783,63 +787,64 @@ window.__ModuleLoader__.load({
       return hash % length;
     }
 
+    /**
+     * v1 held only the folder library (`bg`); v2 adds `manual` for the single
+     * uploaded image, which used to live in localStorage and could crowd out
+     * the Harness's own settings there (the origin shares one ~5 MB quota).
+     */
     function bgDbOpen() {
       return new Promise((resolve, reject) => {
-        const request = indexedDB.open(BG_DB_NAME, 1);
+        const request = indexedDB.open(BG_DB_NAME, 2);
         request.onupgradeneeded = () => {
-          request.result.createObjectStore(BG_DB_STORE);
+          const db = request.result;
+          if (!db.objectStoreNames.contains(BG_DB_STORE)) db.createObjectStore(BG_DB_STORE);
+          if (!db.objectStoreNames.contains(BG_MANUAL_STORE)) db.createObjectStore(BG_MANUAL_STORE);
         };
         request.onsuccess = () => resolve(request.result);
         request.onerror = () => reject(request.error ?? new Error('indexedDB unavailable'));
       });
     }
 
-    async function bgDbPut(key, value) {
+    /** Run one request in a fresh transaction; resolves with its result once committed. */
+    async function bgDbRun(store, mode, makeRequest) {
       const db = await bgDbOpen();
       return new Promise((resolve, reject) => {
-        const tx = db.transaction(BG_DB_STORE, 'readwrite');
-        tx.objectStore(BG_DB_STORE).put(value, key);
+        const tx = db.transaction(store, mode);
+        const request = makeRequest(tx.objectStore(store));
         tx.oncomplete = () => {
           db.close();
-          resolve();
+          resolve(request?.result);
         };
-        tx.onerror = () => {
+        tx.onerror = tx.onabort = () => {
           db.close();
-          reject(tx.error ?? new Error('indexedDB put failed'));
+          reject(tx.error ?? new Error(`indexedDB ${mode} failed`));
         };
       });
     }
 
-    async function bgDbGetAll() {
-      const db = await bgDbOpen();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(BG_DB_STORE, 'readonly');
-        const request = tx.objectStore(BG_DB_STORE).getAll();
-        request.onsuccess = () => {
-          db.close();
-          resolve(request.result ?? []);
-        };
-        request.onerror = () => {
-          db.close();
-          reject(request.error ?? new Error('indexedDB read failed'));
-        };
-      });
-    }
+    const bgDbPut = (key, value) => bgDbRun(BG_DB_STORE, 'readwrite', (s) => s.put(value, key));
+    const bgDbGetAll = async () => (await bgDbRun(BG_DB_STORE, 'readonly', (s) => s.getAll())) ?? [];
+    const bgDbClear = () => bgDbRun(BG_DB_STORE, 'readwrite', (s) => s.clear());
+    const manualBgGet = async () => (await bgDbRun(BG_MANUAL_STORE, 'readonly', (s) => s.get('current'))) ?? null;
+    const manualBgSet = (value) =>
+      bgDbRun(BG_MANUAL_STORE, 'readwrite', (s) => (value === null ? s.delete('current') : s.put(value, 'current')));
 
-    async function bgDbClear() {
-      const db = await bgDbOpen();
-      return new Promise((resolve, reject) => {
-        const tx = db.transaction(BG_DB_STORE, 'readwrite');
-        tx.objectStore(BG_DB_STORE).clear();
-        tx.oncomplete = () => {
-          db.close();
-          resolve();
-        };
-        tx.onerror = () => {
-          db.close();
-          reject(tx.error ?? new Error('indexedDB clear failed'));
-        };
-      });
+    /**
+     * The uploaded background, moving a pre-0.3 localStorage copy into
+     * IndexedDB on first read so the quota is freed.
+     */
+    async function loadManualBg() {
+      const legacy = readStored(BG_STORAGE_KEY);
+      if (legacy) {
+        try {
+          await manualBgSet(legacy);
+          writeStored(BG_STORAGE_KEY, null);
+        } catch {
+          return legacy; // keep showing it; retry the move next time
+        }
+        return legacy;
+      }
+      return manualBgGet();
     }
 
     /** Local calendar label of the stats window; `to` is exclusive. */
@@ -1394,7 +1399,7 @@ window.__ModuleLoader__.load({
       const [skin, setSkin] = React.useState(() => readStored(SKIN_STORAGE_KEY) ?? 'default');
       const [skinOpen, setSkinOpen] = React.useState(false);
       const [dailyRandom, setDailyRandom] = React.useState(() => readStored(BG_DAILY_KEY) === '1');
-      const [manualBg, setManualBg] = React.useState(() => readStored(BG_STORAGE_KEY));
+      const [manualBg, setManualBg] = React.useState(null);
       const [poolCount, setPoolCount] = React.useState(0);
       const [importState, setImportState] = React.useState(null);
       const [skinMsg, setSkinMsg] = React.useState('');
@@ -1511,6 +1516,11 @@ window.__ModuleLoader__.load({
             setPoolCount(poolRef.current.length);
           })
           .catch(() => {});
+        loadManualBg()
+          .then((data) => {
+            if (alive && data) setManualBg(data);
+          })
+          .catch(() => {});
         return () => {
           alive = false;
         };
@@ -1543,9 +1553,15 @@ window.__ModuleLoader__.load({
 
       const uploadOne = (file) => {
         compressImage(file)
-          .then((data) => {
+          .then(async (data) => {
+            // Persist first: an image that cannot be saved would vanish on reload.
+            try {
+              await manualBgSet(data);
+            } catch {
+              flashSkinMsg(t('skin.saveFailed'));
+              return;
+            }
             setManualBg(data);
-            writeStored(BG_STORAGE_KEY, data);
             // A single explicit upload is a deliberate choice: it wins over the daily rotation.
             toggleDaily(false);
             setSkinMsg('');
@@ -1607,6 +1623,7 @@ window.__ModuleLoader__.load({
       const clearManualBg = () => {
         setManualBg(null);
         writeStored(BG_STORAGE_KEY, null);
+        manualBgSet(null).catch(() => {});
       };
 
       const clearPool = () => {
@@ -2128,6 +2145,12 @@ window.__ModuleLoader__.load({
         dailyIndex,
         imageFiles,
         fmtDate,
+        loadManualBg,
+        manualBgSet,
+        manualBgGet,
+        bgDbPut,
+        bgDbGetAll,
+        bgDbClear,
       },
       apply(ctx) {
         ctx.effect(() => {

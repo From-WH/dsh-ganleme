@@ -166,6 +166,60 @@ export async function loadClient({ react, storage } = {}) {
   });
 }
 
+/**
+ * In-memory IndexedDB: enough of open/upgrade/transaction/objectStore for the
+ * plugin's background storage. Data survives across `open` calls.
+ */
+export function fakeIndexedDB() {
+  const dbs = new Map();
+  const later = (fn) => setTimeout(fn, 0);
+  const makeDb = (record) => ({
+    objectStoreNames: { contains: (name) => record.stores.has(name) },
+    createObjectStore(name) {
+      record.stores.set(name, new Map());
+    },
+    close() {},
+    transaction(name) {
+      const map = record.stores.get(name);
+      if (!map) throw new Error(`no object store ${name}`);
+      const tx = { error: null };
+      const wrap = (op) => {
+        const request = { result: undefined };
+        later(() => {
+          request.result = op();
+          tx.oncomplete?.();
+        });
+        return request;
+      };
+      tx.objectStore = () => ({
+        put: (value, key) => wrap(() => (map.set(key, value), key)),
+        get: (key) => wrap(() => map.get(key)),
+        delete: (key) => wrap(() => (map.delete(key), undefined)),
+        getAll: () => wrap(() => [...map.values()]),
+        clear: () => wrap(() => (map.clear(), undefined)),
+      });
+      return tx;
+    },
+  });
+  return {
+    dbs,
+    open(name, version) {
+      const request = {};
+      later(() => {
+        let record = dbs.get(name);
+        if (!record) dbs.set(name, (record = { version: 0, stores: new Map() }));
+        request.result = makeDb(record);
+        if (version > record.version) {
+          record.version = version;
+          request.onupgradeneeded?.();
+        }
+        request.onsuccess?.();
+      });
+      return request;
+    },
+  };
+}
+
 /** A React stand-in that returns initial state and records nothing. */
 export function fakeReact(forcedState = {}) {
   let index = 0;

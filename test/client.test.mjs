@@ -1,7 +1,7 @@
 /** Browser half: report rendering, quips, skins, date helpers, and a render smoke test. */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { fakeReact, loadClient } from './helpers.mjs';
+import { fakeIndexedDB, fakeReact, loadClient } from './helpers.mjs';
 
 const client = await loadClient();
 const T = client.__test;
@@ -115,6 +115,35 @@ test('date presets and custom range validation', () => {
   assert.equal(T.customRangeError('2026-11-07', '2026-11-07', now), 'custom.errFuture');
   assert.equal(T.customRangeError('2026-11-05', '2026-11-01', now), 'custom.errOrder');
   assert.equal(T.customRangeError('2024-01-01', '2026-11-01', now), 'custom.errSpan');
+});
+
+test('uploaded background lives in IndexedDB, apart from the folder library', async () => {
+  const storage = new Map([['dsh.ganleme.bg', 'data:image/jpeg;base64,LEGACY']]);
+  globalThis.indexedDB = fakeIndexedDB();
+  const mod = await loadClient({ storage });
+  const B = mod.__test;
+  // A pre-0.3 localStorage copy moves into IndexedDB and frees the quota.
+  assert.equal(await B.loadManualBg(), 'data:image/jpeg;base64,LEGACY');
+  assert.equal(storage.has('dsh.ganleme.bg'), false);
+  assert.equal(await B.manualBgGet(), 'data:image/jpeg;base64,LEGACY');
+  // Clearing the folder library keeps the uploaded image.
+  await B.bgDbPut('0', 'pool-image');
+  await B.bgDbClear();
+  assert.deepEqual(await B.bgDbGetAll(), []);
+  assert.equal(await B.loadManualBg(), 'data:image/jpeg;base64,LEGACY');
+  await B.manualBgSet(null);
+  assert.equal(await B.loadManualBg(), null);
+  delete globalThis.indexedDB;
+});
+
+test('an existing v1 library survives the upgrade to v2', async () => {
+  const idb = fakeIndexedDB();
+  idb.dbs.set('ganleme', { version: 1, stores: new Map([['bg', new Map([['0', 'old-pool-image']])]]) });
+  globalThis.indexedDB = idb;
+  const B = (await loadClient()).__test;
+  assert.deepEqual(await B.bgDbGetAll(), ['old-pool-image']);
+  assert.equal(await B.manualBgGet(), null, 'manual store created by the upgrade');
+  delete globalThis.indexedDB;
 });
 
 test('dashboard renders in every range including custom', async () => {
