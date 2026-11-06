@@ -28,6 +28,18 @@ window.__ModuleLoader__.load({
       'range.yesterday': '昨天',
       'range.week': '本周',
       'range.month': '本月',
+      'range.custom': '自定义',
+      'custom.from': '开始',
+      'custom.to': '结束',
+      'custom.last7': '近 7 天',
+      'custom.last30': '近 30 天',
+      'custom.lastWeek': '上周',
+      'custom.lastMonth': '上月',
+      'custom.errOrder': '开始日期不能晚于结束日期',
+      'custom.errFuture': '不能选择今天之后的日期',
+      'custom.errSpan': '范围不能超过 366 天',
+      'report.range': '生成区间报告',
+      'report.title.range': '工作报告',
       refresh: '刷新',
       loading: '正在统计…',
       loadFailed: '统计失败',
@@ -129,6 +141,18 @@ window.__ModuleLoader__.load({
       'range.yesterday': 'Yesterday',
       'range.week': 'This week',
       'range.month': 'This month',
+      'range.custom': 'Custom',
+      'custom.from': 'From',
+      'custom.to': 'To',
+      'custom.last7': 'Last 7 days',
+      'custom.last30': 'Last 30 days',
+      'custom.lastWeek': 'Last week',
+      'custom.lastMonth': 'Last month',
+      'custom.errOrder': 'The start date must not be after the end date',
+      'custom.errFuture': 'Dates after today cannot be selected',
+      'custom.errSpan': 'The range must not exceed 366 days',
+      'report.range': 'Range report',
+      'report.title.range': 'Work Report',
       refresh: 'Refresh',
       loading: 'Crunching numbers…',
       loadFailed: 'Failed to load stats',
@@ -538,6 +562,15 @@ window.__ModuleLoader__.load({
 .gl-page[data-skin="bamboo"]{--dsw-alias-bg-base:#e9f2ec;--dsw-alias-bg-layer-1:#fbfdfb;--dsw-alias-bg-layer-2:#e2efe6;--dsw-alias-bg-overlay:#fbfdfb;--dsw-alias-border-l1:#d3e4d9;--dsw-alias-border-l2:#b7d3c1;--dsw-alias-brand-primary:#2f8a5f;--dsw-alias-label-primary:#2c3d33;--dsw-alias-label-secondary:#6e8578;--dsw-alias-interactive-bg-hover:#e3f0e9}
 .gl-page[data-skin="mist"]{--dsw-alias-bg-base:#e9eff7;--dsw-alias-bg-layer-1:#fbfcfe;--dsw-alias-bg-layer-2:#e0eaf4;--dsw-alias-bg-overlay:#fbfcfe;--dsw-alias-border-l1:#d2dfea;--dsw-alias-border-l2:#b4c8da;--dsw-alias-brand-primary:#3479b8;--dsw-alias-label-primary:#2b3644;--dsw-alias-label-secondary:#6d7f92;--dsw-alias-interactive-bg-hover:#e2edf6}
 .gl-page[data-skin="night"]{--dsw-alias-bg-base:#12141a;--dsw-alias-bg-layer-1:#1c1f27;--dsw-alias-bg-layer-2:#262a34;--dsw-alias-bg-overlay:#1c1f27;--dsw-alias-border-l1:#303542;--dsw-alias-border-l2:#454f63;--dsw-alias-brand-primary:#7aa2f7;--dsw-alias-label-primary:#e8eaf0;--dsw-alias-label-secondary:#8d94a5;--dsw-alias-interactive-bg-hover:#262c3a}
+.gl-page[data-skin="night"] .gl-date{color-scheme:dark}
+.gl-dateRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gl-dateLabel{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.gl-date{font:inherit;font-size:13px;line-height:18px;padding:4px 8px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary)}
+.gl-date:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
+.gl-dateSep{color:var(--dsw-alias-label-secondary)}
+.gl-chipBtn{font:inherit;font-size:12px;line-height:16px;padding:3px 10px;border-radius:999px;border:1px solid var(--dsw-alias-border-l1);background:var(--dsw-alias-bg-layer-2);color:var(--dsw-alias-label-secondary);cursor:pointer}
+.gl-chipBtn:hover{color:var(--dsw-alias-label-primary);background:var(--dsw-alias-interactive-bg-hover)}
+.gl-dateError{font-size:12px;color:var(--dsw-alias-state-error-primary)}
 `;
 
     // ------------------------------------------------------------------
@@ -555,6 +588,56 @@ window.__ModuleLoader__.load({
       return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
     };
     const fmtNum = (n) => Number(n ?? 0).toLocaleString();
+
+    // ------------------------------------------------------------------
+    // Custom date range helpers (browser-local calendar days, YYYY-MM-DD)
+    // ------------------------------------------------------------------
+
+    const CUSTOM_MAX_DAYS = 366;
+
+    const parseDay = (text) => {
+      const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text ?? ''));
+      if (!match) return null;
+      const date = new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]));
+      return fmtDate(date) === text ? date : null;
+    };
+
+    const dayOffset = (base, days) => new Date(base.getFullYear(), base.getMonth(), base.getDate() + days);
+
+    /** Quick picks; every preset ends on or before today. */
+    function presetRange(id, now = new Date()) {
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      switch (id) {
+        case 'last7':
+          return { from: fmtDate(dayOffset(today, -6)), to: fmtDate(today) };
+        case 'last30':
+          return { from: fmtDate(dayOffset(today, -29)), to: fmtDate(today) };
+        case 'lastWeek': {
+          const weekday = (today.getDay() + 6) % 7; // Monday = 0
+          const thisMonday = dayOffset(today, -weekday);
+          return { from: fmtDate(dayOffset(thisMonday, -7)), to: fmtDate(dayOffset(thisMonday, -1)) };
+        }
+        case 'lastMonth': {
+          const first = new Date(today.getFullYear(), today.getMonth() - 1, 1);
+          const last = new Date(today.getFullYear(), today.getMonth(), 0);
+          return { from: fmtDate(first), to: fmtDate(last) };
+        }
+        default:
+          return null;
+      }
+    }
+
+    /** @returns the dictionary key of the first violated rule, or null. */
+    function customRangeError(fromStr, toStr, now = new Date()) {
+      const from = parseDay(fromStr);
+      const to = parseDay(toStr);
+      if (!from || !to) return 'custom.errOrder';
+      if (from > to) return 'custom.errOrder';
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      if (to > today) return 'custom.errFuture';
+      if (Math.round((to - from) / 86_400_000) + 1 > CUSTOM_MAX_DAYS) return 'custom.errSpan';
+      return null;
+    }
 
     async function fetchJson(route) {
       const res = await fetch(route, { headers: { accept: 'application/json' } });
@@ -878,7 +961,8 @@ window.__ModuleLoader__.load({
       );
     }
 
-    const RANGES = ['today', 'yesterday', 'week', 'month'];
+    const RANGES = ['today', 'yesterday', 'week', 'month', 'custom'];
+    const CUSTOM_PRESETS = ['last7', 'last30', 'lastWeek', 'lastMonth'];
     const REPORT_KINDS = [
       { kind: 'daily', key: 'report.daily', range: 'today' },
       { kind: 'weekly', key: 'report.weekly', range: 'week' },
@@ -1285,6 +1369,15 @@ window.__ModuleLoader__.load({
     /** The full-page dashboard bound to the `ganleme` main-panel key. */
     function DashboardPage({ t, addRootPick, addRoot, removeRoot, loadRoots }) {
       const [range, setRange] = React.useState('today');
+      const [customRange, setCustomRange] = React.useState(() => presetRange('last7'));
+      const todayStr = fmtDate(new Date());
+      const customError = range === 'custom' ? customRangeError(customRange.from, customRange.to) : null;
+      /** Cache key and stats URL for the active view; null while a custom range is invalid. */
+      const statsKey = range === 'custom' ? (customError ? null : `custom:${customRange.from}..${customRange.to}`) : range;
+      const statsUrl =
+        range === 'custom'
+          ? `ganleme/stats?range=custom&from=${encodeURIComponent(customRange.from)}&to=${encodeURIComponent(customRange.to)}`
+          : `ganleme/stats?range=${range}`;
       const [scope, setScope] = React.useState('all');
       const [reportScope, setReportScope] = React.useState('mine');
       const [reportFormat, setReportFormat] = React.useState('plain');
@@ -1321,7 +1414,14 @@ window.__ModuleLoader__.load({
 
       React.useEffect(() => {
         let alive = true;
-        const cached = cacheRef.current.get(range);
+        if (statsKey === null) {
+          // Invalid custom range: show the inline error, keep no stale numbers.
+          setPayload(null);
+          setPhase('invalid');
+          setErrorText('');
+          return;
+        }
+        const cached = cacheRef.current.get(statsKey);
         if (cached) {
           setPayload(cached);
           setPhase('ready');
@@ -1331,10 +1431,10 @@ window.__ModuleLoader__.load({
         setPayload(null);
         setPhase('loading');
         setErrorText('');
-        fetchJson(`ganleme/stats?range=${range}`)
+        fetchJson(statsUrl)
           .then((data) => {
             if (!alive) return;
-            cacheRef.current.set(range, data);
+            cacheRef.current.set(statsKey, data);
             setPayload(data);
             setPhase('ready');
           })
@@ -1346,7 +1446,7 @@ window.__ModuleLoader__.load({
         return () => {
           alive = false;
         };
-      }, [range, tick]);
+      }, [statsKey, tick]);
 
       React.useEffect(() => {
         if (!report) return;
@@ -1658,21 +1758,29 @@ window.__ModuleLoader__.load({
       const generateReport = (entry) => {
         // Reports default to the caller's own commits in the detailed variant;
         // the modal can widen the scope, drop to the concise variant, or switch format.
-        const cached = cacheRef.current.get(entry.range);
+        // entry.key/url override the preset range (used by the custom range report).
+        const key = entry.cacheKey ?? entry.range;
+        const url = entry.url ?? `ganleme/stats?range=${entry.range}`;
+        const cached = cacheRef.current.get(key);
         setReportScope('mine');
         if (cached) {
           setReport({ kind: entry.kind, data: cached, text: buildReport(t, entry.kind, cached, 'mine', reportFormat, reportBrief) });
           return;
         }
         setReport({ kind: entry.kind });
-        fetchJson(`ganleme/stats?range=${entry.range}`)
+        fetchJson(url)
           .then((data) => {
-            cacheRef.current.set(entry.range, data);
+            cacheRef.current.set(key, data);
             setReport({ kind: entry.kind, data, text: buildReport(t, entry.kind, data, 'mine', reportFormat, reportBrief) });
           })
           .catch((error) => {
             setReport({ kind: entry.kind, error: String(error?.message ?? error) });
           });
+      };
+
+      const generateCustomReport = () => {
+        if (statsKey === null) return;
+        generateReport({ kind: 'range', cacheKey: statsKey, url: statsUrl });
       };
 
       const changeReportScope = (next) => {
@@ -1825,6 +1933,45 @@ window.__ModuleLoader__.load({
               ),
             ),
           ),
+          range === 'custom'
+            ? h(
+                'div',
+                { className: 'gl-dateRow' },
+                h('span', { className: 'gl-dateLabel' }, t('custom.from')),
+                h('input', {
+                  type: 'date',
+                  className: 'gl-date',
+                  'aria-label': t('custom.from'),
+                  value: customRange.from,
+                  max: customRange.to && customRange.to <= todayStr ? customRange.to : todayStr,
+                  onChange: (e) => setCustomRange((prev) => ({ ...prev, from: e.target.value })),
+                }),
+                h('span', { className: 'gl-dateSep' }, '—'),
+                h('span', { className: 'gl-dateLabel' }, t('custom.to')),
+                h('input', {
+                  type: 'date',
+                  className: 'gl-date',
+                  'aria-label': t('custom.to'),
+                  value: customRange.to,
+                  min: customRange.from || undefined,
+                  max: todayStr,
+                  onChange: (e) => setCustomRange((prev) => ({ ...prev, to: e.target.value })),
+                }),
+                CUSTOM_PRESETS.map((id) =>
+                  h(
+                    'button',
+                    { key: id, className: 'gl-chipBtn', onClick: () => setCustomRange(presetRange(id)) },
+                    t('custom.' + id),
+                  ),
+                ),
+                h(
+                  'button',
+                  { className: 'gl-btn', style: { marginLeft: 'auto' }, disabled: statsKey === null, onClick: generateCustomReport },
+                  t('report.range'),
+                ),
+                customError ? h('span', { className: 'gl-dateError', role: 'alert', style: { flexBasis: '100%' } }, t(customError)) : null,
+              )
+            : null,
           phase === 'loading'
             ? h('div', { className: 'gl-status' }, h('span', { className: 'gl-dot' }), t('loading'))
             : null,

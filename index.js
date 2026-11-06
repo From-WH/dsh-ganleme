@@ -94,6 +94,35 @@ export function windowFor(range, now = new Date()) {
   }
 }
 
+/** Longest custom range accepted, in days (inclusive). */
+export const CUSTOM_RANGE_MAX_DAYS = 366;
+
+/**
+ * Parse a custom `YYYY-MM-DD` range in Host-local calendar days.
+ * @returns `{ from, to }` with `to` exclusive (the day after `toStr`), or
+ *   `{ error }` when a date is malformed, reversed, in the future, or the
+ *   span exceeds CUSTOM_RANGE_MAX_DAYS.
+ */
+export function customWindow(fromStr, toStr, now = new Date()) {
+  const parse = (text) => {
+    const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(text ?? ''));
+    if (!match) return null;
+    const [, y, m, d] = match.map(Number);
+    const date = new Date(y, m - 1, d);
+    // Reject roll-overs such as 2026-02-31.
+    if (date.getFullYear() !== y || date.getMonth() !== m - 1 || date.getDate() !== d) return null;
+    return date;
+  };
+  const from = parse(fromStr);
+  const to = parse(toStr);
+  if (!from || !to) return { error: 'from and to must be YYYY-MM-DD dates' };
+  if (from > to) return { error: 'from must not be after to' };
+  if (to > startOfDay(now)) return { error: 'to must not be after today' };
+  const days = Math.round((to - from) / 86_400_000) + 1;
+  if (days > CUSTOM_RANGE_MAX_DAYS) return { error: `range must not exceed ${CUSTOM_RANGE_MAX_DAYS} days` };
+  return { from, to: addDays(to, 1) };
+}
+
 /** ISO 8601 with the process-local offset; git's --since parses this form. */
 function isoLocal(date) {
   const offset = -date.getTimezoneOffset();
@@ -328,6 +357,9 @@ async function repoStats(git, repo, window, config) {
     `--pretty=format:${RECORD}%H${FIELD}%h${FIELD}%an${FIELD}%ae${FIELD}%at${FIELD}%s`,
     '--numstat',
     '--since=' + isoLocal(window.from),
+    // Bound the end too: for a past range, newer commits would otherwise use
+    // up the commitLimit before git reaches the requested window.
+    '--until=' + isoLocal(window.to),
     `--max-count=${Math.max(1, config.commitLimit)}`,
   ];
   const [logRun, branchRun, me] = await Promise.all([
@@ -497,13 +529,18 @@ export function apply(ctx, config) {
     return promise;
   };
 
-  const cachedStats = (range, refresh) => {
+  /**
+   * @param range a preset id, or 'custom' with `custom = { from, to, key }`
+   *   where from/to are Dates (to exclusive) and key is the cache key.
+   */
+  const cachedStats = (range, refresh, custom = null) => {
     const now = Date.now();
     const fp = workspaceFingerprint();
-    const hit = statsCache.get(range);
+    const cacheKey = custom ? `custom:${custom.key}` : range;
+    const hit = statsCache.get(cacheKey);
     if (!refresh && hit && hit.expires > now && hit.fp === fp) return hit.promise;
     const promise = (async () => {
-      const window = windowFor(range, new Date());
+      const window = custom ? { from: custom.from, to: custom.to } : windowFor(range, new Date());
       const repos = await cachedRepos(refresh);
       const git = await resolvedGit();
       const results = await Promise.all(repos.map((repo) => repoStats(git, repo, window, config)));
@@ -518,7 +555,11 @@ export function apply(ctx, config) {
         repos: results,
       };
     })();
-    statsCache.set(range, { expires: now + Math.max(5_000, config.cacheMs), promise, fp });
+    // Bound memory: custom keys are user-chosen, so drop the oldest beyond 24.
+    if (custom && statsCache.size >= 24 && !statsCache.has(cacheKey)) {
+      statsCache.delete(statsCache.keys().next().value);
+    }
+    statsCache.set(cacheKey, { expires: now + Math.max(5_000, config.cacheMs), promise, fp });
     return promise;
   };
 
@@ -573,12 +614,22 @@ export function apply(ctx, config) {
           const url = new URL(String(req.url), 'http://localhost');
           const range = url.searchParams.get('range') ?? 'today';
           const refresh = url.searchParams.get('refresh') === '1';
-          if (!RANGES.has(range)) {
-            sendJson(res, 400, { code: 'bad-range', message: 'range must be one of today|yesterday|week|month' });
+          let custom = null;
+          if (range === 'custom') {
+            const fromStr = url.searchParams.get('from');
+            const toStr = url.searchParams.get('to');
+            const parsed = customWindow(fromStr, toStr, new Date());
+            if (parsed.error) {
+              sendJson(res, 400, { code: 'bad-range', message: parsed.error });
+              return;
+            }
+            custom = { ...parsed, key: `${fromStr}..${toStr}` };
+          } else if (!RANGES.has(range)) {
+            sendJson(res, 400, { code: 'bad-range', message: 'range must be one of today|yesterday|week|month|custom' });
             return;
           }
           try {
-            sendJson(res, 200, await cachedStats(range, refresh));
+            sendJson(res, 200, await cachedStats(range, refresh, custom));
           } catch (error) {
             sendJson(res, 500, { code: 'stats-failed', message: String(error?.message ?? error) });
           }
