@@ -1413,7 +1413,7 @@ window.__ModuleLoader__.load({
     }
 
     /** The full-page dashboard bound to the `ganleme` main-panel key. */
-    function DashboardPage({ t, addRootPick, addRoot, removeRoot, loadRoots }) {
+    function DashboardPage({ t, addRootPick, addRoot, removeRoot, loadRoots, localeId }) {
       const [range, setRange] = React.useState('today');
       const [customRange, setCustomRange] = React.useState(() => presetRange('last7'));
       const todayStr = fmtDate(new Date());
@@ -1749,7 +1749,8 @@ window.__ModuleLoader__.load({
         };
       }, [scope, tick]);
 
-      const quipLang = () => (t('subtitle') === '看看最近各仓库干了多少活' ? 'zh' : 'en');
+      // Quip pools exist in zh and en; any zh-* locale uses zh, all else en.
+      const quipLang = () => (String(localeId?.() ?? '').toLowerCase().startsWith('zh') ? 'zh' : 'en');
 
       React.useEffect(() => {
         if (!todayStats) return;
@@ -2219,6 +2220,7 @@ window.__ModuleLoader__.load({
         );
         /** Browser → Host face: the native directory picker and project-source routes. */
         const face = {
+          localeId: () => ctx.locale.getLocale?.().active ?? '',
           async addRootPick() {
             const res = await fetch('ganleme/roots/pick', { method: 'POST' });
             const body = await res.json().catch(() => null);

@@ -178,6 +178,18 @@ test('stats cache entries expire', () => {
   assert.equal(cache.get('a'), undefined);
 });
 
+test('the page reads the language from the locale service', async () => {
+  const mod = await loadClient();
+  const registered = [];
+  mod.apply({
+    effect() {},
+    locale: { register() {}, bind: () => (k) => k, getLocale: () => ({ active: 'en' }) },
+    slots: { inject: (_name, cb) => cb(), register: (opts, comp) => registered.push({ opts, comp }) },
+  });
+  const opts = registered.find((r) => r.opts.name === 'main').opts;
+  assert.equal(opts.inject().localeId(), 'en');
+});
+
 test('dashboard renders in every range including custom', async () => {
   for (const range of ['today', 'custom']) {
     const mod = await loadClient({ react: fakeReact({ 0: range }) });
