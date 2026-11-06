@@ -146,6 +146,19 @@ test('an existing v1 library survives the upgrade to v2', async () => {
   delete globalThis.indexedDB;
 });
 
+test('stats cache entries expire', () => {
+  let clock = 1_000;
+  const cache = T.createStatsCache(60_000, () => clock);
+  cache.set('today', { n: 1 });
+  clock += 59_000;
+  assert.deepEqual(cache.get('today'), { n: 1 });
+  clock += 2_000;
+  assert.equal(cache.get('today'), undefined, 'stale after the TTL');
+  cache.set('a', 1);
+  cache.clear();
+  assert.equal(cache.get('a'), undefined);
+});
+
 test('dashboard renders in every range including custom', async () => {
   for (const range of ['today', 'custom']) {
     const mod = await loadClient({ react: fakeReact({ 0: range }) });

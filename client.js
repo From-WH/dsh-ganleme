@@ -972,6 +972,32 @@ window.__ModuleLoader__.load({
       );
     }
 
+    /**
+     * Stats responses keyed by range, dropped after `ttlMs` (the Host's own
+     * stats cache defaults to 60 s). Without expiry a page left open all day
+     * kept showing the morning's numbers until someone clicked refresh.
+     */
+    function createStatsCache(ttlMs = 60_000, now = () => Date.now()) {
+      const entries = new Map();
+      return {
+        get(key) {
+          const hit = entries.get(key);
+          if (!hit) return undefined;
+          if (now() - hit.at > ttlMs) {
+            entries.delete(key);
+            return undefined;
+          }
+          return hit.value;
+        },
+        set(key, value) {
+          entries.set(key, { value, at: now() });
+        },
+        clear() {
+          entries.clear();
+        },
+      };
+    }
+
     const RANGES = ['today', 'yesterday', 'week', 'month', 'custom'];
     const CUSTOM_PRESETS = ['last7', 'last30', 'lastWeek', 'lastMonth'];
     const REPORT_KINDS = [
@@ -1420,7 +1446,8 @@ window.__ModuleLoader__.load({
       const [report, setReport] = React.useState(null);
       const [copied, setCopied] = React.useState(false);
       const [tick, setTick] = React.useState(0);
-      const cacheRef = React.useRef(new Map());
+      const cacheRef = React.useRef(null);
+      if (cacheRef.current === null) cacheRef.current = createStatsCache();
       const copyTimer = React.useRef(null);
       const skinMsgTimer = React.useRef(null);
       const updateTimer = React.useRef(null);
@@ -1461,6 +1488,15 @@ window.__ModuleLoader__.load({
           alive = false;
         };
       }, [statsKey, tick]);
+
+      // Coming back to a page left open: refetch once the cached numbers are stale.
+      React.useEffect(() => {
+        const onFocus = () => {
+          if (statsKey !== null && cacheRef.current.get(statsKey) === undefined) setTick((x) => x + 1);
+        };
+        window.addEventListener('focus', onFocus);
+        return () => window.removeEventListener('focus', onFocus);
+      }, [statsKey]);
 
       React.useEffect(() => {
         if (!report) return;
@@ -2145,6 +2181,7 @@ window.__ModuleLoader__.load({
         dailyIndex,
         imageFiles,
         fmtDate,
+        createStatsCache,
         loadManualBg,
         manualBgSet,
         manualBgGet,
