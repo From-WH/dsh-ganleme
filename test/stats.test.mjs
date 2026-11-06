@@ -144,6 +144,20 @@ test('hitting commitLimit marks the repo as possibly incomplete', async () => {
   assert.equal((await stats(roomy.call, { from: D, to: D })).json.repos[0].truncated, false);
 });
 
+test('many repositories are all read under the concurrency limit', async () => {
+  const list = [];
+  for (let i = 0; i < 14; i += 1) {
+    const repo = makeRepo(`many-${i}`);
+    commit(repo, { message: `c${i}`, date: at(-2) });
+    list.push({ path: repo, title: `m${i}` });
+  }
+  const { call } = await makeHost({ workspaces: list, config: { gitConcurrency: 2 } });
+  const { json } = await stats(call, { from: D, to: D });
+  assert.equal(json.repos.length, 14);
+  assert.ok(json.repos.every((r) => r.ok && r.stats.commits === 1));
+  assert.deepEqual(json.repos.map((r) => r.title), list.map((w) => w.title), 'order is preserved');
+});
+
 test('custom ranges are validated', async () => {
   const { call } = await makeHost();
   assert.equal((await stats(call, { from: day(-1), to: day(-5) })).status, 400);

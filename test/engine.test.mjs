@@ -64,6 +64,21 @@ test('parseLog: window filter, numstat totals, binary files, newest first', () =
   assert.equal(commits[1].files, 2, 'binary files still count as changed files');
 });
 
+test('mapLimit keeps order and never exceeds the limit', async () => {
+  let live = 0;
+  let peak = 0;
+  const out = await host.mapLimit([5, 1, 4, 2, 3, 0, 6], 3, async (n) => {
+    live += 1;
+    peak = Math.max(peak, live);
+    await new Promise((resolve) => setTimeout(resolve, n * 3));
+    live -= 1;
+    return n * 10;
+  });
+  assert.deepEqual(out, [50, 10, 40, 20, 30, 0, 60]);
+  assert.equal(peak, 3);
+  assert.deepEqual(await host.mapLimit([], 4, async () => 1), []);
+});
+
 test('parseLog: rename paths resolve to the new path', { todo: 'low-priority fix: nested brace renames' }, () => {
   const window = { from: new Date(0), to: new Date('2100-01-01') };
   const cases = {

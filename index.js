@@ -47,6 +47,8 @@ export const Config = z.object({
   excludedPaths: z.array(z.string()).default([]),
   /** How many directory levels below a root to search for git repositories. */
   scanDepth: z.number().min(1).max(3).default(1),
+  /** Repositories read at the same time; each runs about four git processes. */
+  gitConcurrency: z.number().min(1).max(32).default(6),
   /** Count merge commits too; off by default since they carry no work of their own. */
   includeMerges: z.boolean().default(false),
   /** Read every local branch, not only the checked-out one. */
@@ -438,6 +440,26 @@ async function repoStats(git, repo, window, config) {
   };
 }
 
+/**
+ * Map with at most `limit` calls in flight; results keep input order. Reading
+ * every repository at once started ~4 git processes per repository (320 for
+ * 80 repositories), which can exhaust process or file limits.
+ */
+export async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(items[index], index);
+    }
+  };
+  const width = Math.max(1, Math.min(Math.floor(Number(limit)) || 1, items.length));
+  await Promise.all(Array.from({ length: width }, worker));
+  return results;
+}
+
 /** Sum aggregate objects into one totals object. */
 function sumStats(list) {
   const totals = { commits: 0, insertions: 0, deletions: 0, files: 0, authors: [] };
@@ -616,7 +638,7 @@ export function apply(ctx, config) {
       const window = custom ? { from: custom.from, to: custom.to } : windowFor(range, new Date());
       const repos = await cachedRepos(refresh);
       const git = await resolvedGit();
-      const results = await Promise.all(repos.map((repo) => repoStats(git, repo, window, config)));
+      const results = await mapLimit(repos, config.gitConcurrency ?? 6, (repo) => repoStats(git, repo, window, config));
       const { totals, mine } = buildTotals(results);
       return {
         range,
