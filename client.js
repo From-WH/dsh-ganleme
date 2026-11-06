@@ -43,6 +43,9 @@ window.__ModuleLoader__.load({
       'report.title.range': '工作报告',
       refresh: '刷新',
       loading: '正在统计…',
+      'loading.2': '正在翻 git 账本…',
+      'loading.3': '正在数你今天敲了多少行…',
+      'loading.4': '小人趁机摸会儿鱼…',
       loadFailed: '统计失败',
       retry: '重试',
       'section.repos': '仓库明细',
@@ -249,6 +252,9 @@ window.__ModuleLoader__.load({
       'report.title.range': 'Work Report',
       refresh: 'Refresh',
       loading: 'Crunching numbers…',
+      'loading.2': 'Leafing through the git ledger…',
+      'loading.3': 'Counting the lines you typed today…',
+      'loading.4': 'Someone is sneaking in a nap…',
       loadFailed: 'Failed to load stats',
       retry: 'Retry',
       'section.repos': 'Repositories',
@@ -707,7 +713,34 @@ window.__ModuleLoader__.load({
 .gl-empty{border:1px dashed var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-md);padding:32px 24px;text-align:center}
 .gl-emptyTitle{margin:0;font-size:14px;font-weight:600}
 .gl-emptyHint{margin:6px 0 0;font-size:12px;color:var(--dsw-alias-label-secondary)}
-.gl-status{display:flex;align-items:center;gap:8px;padding:24px 4px;color:var(--dsw-alias-label-secondary);font-size:13px}
+
+/* Waiting state: bars grow in turn, the sleeper rides the tallest, a fish passes. */
+.gl-importing{display:flex;align-items:center;gap:10px}
+.gl-importingText{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
+.gl-progress{height:4px;border-radius:2px;background:var(--dsw-alias-bg-layer-2);overflow:hidden}
+.gl-progressFill{height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .25s ease}
+.gl-load{display:inline-flex;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary)}
+.gl-loadArt{flex:none;overflow:visible}
+.gl-loadLabel{font-size:13px;line-height:19px}
+.gl-loadBar{transform-box:fill-box;transform-origin:bottom;animation:gl-grow 1.6s ease-in-out infinite}
+.gl-loadBar[data-bar="1"]{animation-delay:0s}
+.gl-loadBar[data-bar="2"]{animation-delay:.18s}
+.gl-loadBar[data-bar="3"]{animation-delay:.36s}
+.gl-loadSleeper{animation:gl-bob 1.8s ease-in-out infinite}
+.gl-loadZzz{transform-box:fill-box;transform-origin:center;animation:gl-zzz 2.2s ease-in-out infinite}
+.gl-loadFish{animation:gl-swim 3.2s linear infinite}
+.gl-loadBubble{animation:gl-rise 2.4s ease-out infinite}
+.gl-loadBubble[data-b="2"]{animation-delay:.7s}
+@keyframes gl-grow{0%,100%{transform:scaleY(.55)}45%{transform:scaleY(1)}}
+@keyframes gl-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.6px)}}
+@keyframes gl-zzz{0%{opacity:.15;transform:translateY(1px) scale(.94)}45%{opacity:.95;transform:translateY(-2px) scale(1)}100%{opacity:0;transform:translateY(-5px) scale(1.04)}}
+@keyframes gl-swim{0%{transform:translateX(-6px)}55%{transform:translateX(10px)}100%{transform:translateX(-6px)}}
+@keyframes gl-rise{0%{opacity:0;transform:translateY(3px)}30%{opacity:.8}100%{opacity:0;transform:translateY(-6px)}}
+/* Respect a reduced-motion preference: keep the art, drop the movement. */
+@media (prefers-reduced-motion: reduce){
+  .gl-loadBar,.gl-loadSleeper,.gl-loadZzz,.gl-loadFish,.gl-loadBubble{animation:none}
+}
+.gl-status{display:flex;align-items:center;gap:8px;padding:28px 4px;color:var(--dsw-alias-label-secondary);font-size:13px}
 .gl-dot{width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-brand-primary);animation:gl-pulse 1.2s ease-in-out infinite}
 .gl-dot[data-error="true"]{background:var(--dsw-alias-state-error-primary);animation:none}
 @keyframes gl-pulse{0%,100%{opacity:.35}50%{opacity:1}}
@@ -758,6 +791,7 @@ window.__ModuleLoader__.load({
 .gl-modalHead{display:flex;align-items:center;gap:10px;padding:14px 18px;border-bottom:1px solid var(--dsw-alias-border-l1)}
 .gl-modalTitle{margin:0;font-size:15px;font-weight:600}
 .gl-modalRange{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.gl-preLoading{display:flex;align-items:center;justify-content:center;min-height:220px}
 .gl-pre{flex:1;overflow:auto;margin:0;padding:16px 18px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:12.5px;line-height:1.6;white-space:pre-wrap;word-break:break-word;color:var(--dsw-alias-label-primary)}
 .gl-modalFoot{display:flex;justify-content:flex-end;gap:8px;padding:12px 18px;border-top:1px solid var(--dsw-alias-border-l1)}
 .gl-skinLabel{font-size:12px;color:var(--dsw-alias-label-secondary);margin-right:2px}
@@ -1691,7 +1725,9 @@ window.__ModuleLoader__.load({
           ),
           report.error
             ? h('div', { className: 'gl-pre' }, `${t('report.failed')}: ${report.error}`)
-            : h('pre', { className: 'gl-pre' }, (showOriginal ? report.original : report.text) ?? t('report.generating')),
+            : (showOriginal ? report.original : report.text)
+              ? h('pre', { className: 'gl-pre' }, showOriginal ? report.original : report.text)
+              : h('div', { className: 'gl-pre gl-preLoading' }, h(LoadingGlyph, { size: 72, label: t('report.generating') })),
           h(
             'div',
             { className: 'gl-modalFoot' },
@@ -1704,6 +1740,74 @@ window.__ModuleLoader__.load({
           ),
         ),
       );
+    }
+
+    /**
+     * The plugin's waiting indicator: three bars growing in turn, a small figure
+     * dozing on the tallest one, and a fish swimming past. Pure SVG so it renders
+     * inside any slot; the animation lives in the stylesheet (`.gl-load`), so the
+     * component stays a static tree.
+     * @param props.size edge length in px; props.label drawn beside it.
+     */
+    function LoadingGlyph({ size = 56, label }) {
+      // Gradient ids are document-global; a single hidden instance defines them
+      // once so two loaders on one page cannot fight over the same id.
+      const gradientId = (name) => `${name}-${PACKAGE.replace(/[^a-z0-9]/gi, '')}`;
+      return h(
+        'div',
+        { className: 'gl-load', role: 'status', 'aria-live': 'polite' },
+        h(
+          'svg',
+          { width: size, height: size, viewBox: '0 0 64 64', 'aria-hidden': true, className: 'gl-loadArt' },
+          h(
+            'defs',
+            null,
+            h('linearGradient', { id: gradientId('glLoadBar1'), x1: 0, y1: 0, x2: 0, y2: 1 },
+              h('stop', { offset: 0, stopColor: '#34d9f2' }), h('stop', { offset: 1, stopColor: '#0e9cc4' })),
+            h('linearGradient', { id: gradientId('glLoadBar2'), x1: 0, y1: 0, x2: 0, y2: 1 },
+              h('stop', { offset: 0, stopColor: '#5fa2f7' }), h('stop', { offset: 1, stopColor: '#2f5fe0' })),
+            h('linearGradient', { id: gradientId('glLoadBar3'), x1: 0, y1: 0, x2: 0, y2: 1 },
+              h('stop', { offset: 0, stopColor: '#b78efc' }), h('stop', { offset: 1, stopColor: '#7c46e8' })),
+          ),
+          // Bars: each grows and settles on its own delay.
+          h('rect', { className: 'gl-loadBar', 'data-bar': '1', x: 12, y: 30, width: 9, height: 22, rx: 3, fill: `url(#${gradientId('glLoadBar1')})` }),
+          h('rect', { className: 'gl-loadBar', 'data-bar': '2', x: 26, y: 22, width: 9, height: 30, rx: 3, fill: `url(#${gradientId('glLoadBar2')})` }),
+          h('rect', { className: 'gl-loadBar', 'data-bar': '3', x: 40, y: 12, width: 9, height: 40, rx: 3, fill: `url(#${gradientId('glLoadBar3')})` }),
+          // The dozing figure rides the tallest bar.
+          h('g', { className: 'gl-loadSleeper' },
+            h('rect', { x: 44, y: 12, width: 8, height: 4.4, rx: 2.2, fill: '#eef4ff' }),
+            h('circle', { cx: 44.6, cy: 9.4, r: 3.1, fill: '#ffffff' }),
+          ),
+          h('g', { className: 'gl-loadZzz' },
+            h('path', { d: 'M53 12h4.4l-4.4 4.4H57', stroke: '#bfe0ff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }),
+            h('path', { d: 'M56.5 6.5h3l-3 3h3', stroke: '#bfe0ff', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none', opacity: 0.7 }),
+          ),
+          // A fish swims across the bottom, bubbles trailing.
+          h('g', { className: 'gl-loadFish' },
+            h('ellipse', { cx: 20, cy: 55, rx: 5, ry: 3, fill: '#6fe6f7' }),
+            h('path', { d: 'M24.6 55L28 52.8v4.4Z', fill: '#6fe6f7' }),
+            h('circle', { cx: 18, cy: 54.2, r: 0.8, fill: '#0c1428' }),
+          ),
+          h('circle', { className: 'gl-loadBubble', 'data-b': '1', cx: 28, cy: 51, r: 1.3, fill: '#7de3f5' }),
+          h('circle', { className: 'gl-loadBubble', 'data-b': '2', cx: 31, cy: 48, r: 1, fill: '#7de3f5' }),
+        ),
+        label ? h('span', { className: 'gl-loadLabel' }, label) : null,
+      );
+    }
+
+    /**
+     * Rotating waiting copy, so a long wait does not repeat one flat sentence.
+     * @param lines localized strings shown in order.
+     * @returns the current line; changes on a timer owned by the caller.
+     */
+    function useRotatingText(lines, intervalMs = 2200, active = true) {
+      const [index, setIndex] = React.useState(0);
+      React.useEffect(() => {
+        if (!active || lines.length < 2) return undefined;
+        const timer = setInterval(() => setIndex((i) => (i + 1) % lines.length), intervalMs);
+        return () => clearInterval(timer);
+      }, [active, lines.length, intervalMs]);
+      return lines[index % lines.length];
     }
 
     /** Gear glyph: opens the report format settings. */
@@ -2015,7 +2119,11 @@ window.__ModuleLoader__.load({
                     onChange: (e) => onOutput(e.target.value),
                     'aria-label': t('polish.result'),
                   })
-                : h('pre', { className: 'gl-setPreviewBody' }, output || t(streaming ? 'polish.waiting' : 'polish.idle')),
+                : output
+                  ? h('pre', { className: 'gl-setPreviewBody' }, output)
+                  : streaming
+                    ? h('div', { className: 'gl-setPreviewBody gl-preLoading' }, h(LoadingGlyph, { size: 56, label: t('polish.waiting') }))
+                    : h('pre', { className: 'gl-setPreviewBody' }, t('polish.idle')),
             ),
           ),
           h(
@@ -2104,19 +2212,42 @@ window.__ModuleLoader__.load({
                 }),
               ),
             ),
-            h(
-              'div',
-              { className: 'gl-skinStatus' },
-              importState
-                ? fmt(t('skin.importing'), { done: importState.done, total: importState.total })
-                : [
+            importState
+              ? h(
+                  'div',
+                  { className: 'gl-skinStatus gl-importing' },
+                  h(LoadingGlyph, { size: 34 }),
+                  h(
+                    'div',
+                    { className: 'gl-importingText' },
+                    h('span', null, fmt(t('skin.importing'), { done: importState.done, total: importState.total })),
+                    h(
+                      'div',
+                      {
+                        className: 'gl-progress',
+                        role: 'progressbar',
+                        'aria-valuemin': 0,
+                        'aria-valuemax': importState.total,
+                        'aria-valuenow': importState.done,
+                      },
+                      h('div', {
+                        className: 'gl-progressFill',
+                        style: { width: `${Math.round((importState.done / Math.max(1, importState.total)) * 100)}%` },
+                      }),
+                    ),
+                  ),
+                )
+              : h(
+                  'div',
+                  { className: 'gl-skinStatus' },
+                  [
                     daily && poolCount === 0 ? t('skin.needPool') : poolCount > 0 ? fmt(t('skin.poolCount'), { n: poolCount }) : '',
                     message,
                   ]
                     .filter(Boolean)
                     .join('  ')
                     .trim() || '',
-            ),
+                ),
             h(
               'div',
               { className: 'gl-skinRow', style: { marginTop: '12px' } },
@@ -2290,6 +2421,12 @@ window.__ModuleLoader__.load({
       const [rootsMsg, setRootsMsg] = React.useState('');
       const [payload, setPayload] = React.useState(null);
       const [phase, setPhase] = React.useState('loading');
+      /** Rotating copy under the loading art; the jokes match the theme. */
+      const loadingText = useRotatingText(
+        [t('loading'), t('loading.2'), t('loading.3'), t('loading.4')],
+        2400,
+        phase === 'loading',
+      );
       const [todayStats, setTodayStats] = React.useState(null);
       const [quip, setQuip] = React.useState(null);
       const quipDeckRef = React.useRef({});
@@ -3111,7 +3248,7 @@ window.__ModuleLoader__.load({
               )
             : null,
           phase === 'loading'
-            ? h('div', { className: 'gl-status' }, h('span', { className: 'gl-dot' }), t('loading'))
+            ? h('div', { className: 'gl-status' }, h(LoadingGlyph, { size: 64, label: loadingText }))
             : null,
           phase === 'error'
             ? h(
@@ -3289,6 +3426,9 @@ window.__ModuleLoader__.load({
         COMMIT_TYPES,
         POLISH_LEVELS,
         POLISH_TONES,
+        LoadingGlyph,
+        useRotatingText,
+        SkinModal,
         PolishSheet,
         polishSource,
         checkPolishNumbers,

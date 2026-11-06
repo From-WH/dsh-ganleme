@@ -438,6 +438,127 @@ test('the applied rewrite keeps the original reachable and shows a notice', asyn
   assert.equal(applied.text, '本期完成 3 次提交。');
 });
 
+test('the loading art carries the theme: bars, a sleeper and a fish', async () => {
+  const captured = [];
+  const React = {
+    ...fakeReact(),
+    createElement: (type, props, ...kids) => {
+      const node = { type, props: { ...props, children: kids.length === 1 ? kids[0] : kids } };
+      captured.push(node);
+      return node;
+    },
+  };
+  const mod = await loadClient({ react: React });
+  mod.__test.LoadingGlyph({ size: 64, label: '正在统计…' });
+  const byClass = (name) => captured.filter((c) => String(c.props.className ?? '') === name);
+  assert.equal(byClass('gl-loadBar').length, 3, 'three growing bars');
+  assert.equal(byClass('gl-loadSleeper').length, 1, 'the dozing figure');
+  assert.equal(byClass('gl-loadZzz').length, 1, 'sleep marks');
+  assert.equal(byClass('gl-loadFish').length, 1, 'the fish');
+  assert.equal(byClass('gl-loadBubble').length, 2, 'bubbles');
+  assert.ok(captured.some((c) => c.props.role === 'status'), 'announced as a status');
+  assert.ok(byClass('gl-loadLabel').length === 1, 'the copy sits beside the art');
+  // Gradient ids are scoped to the package so two loaders cannot collide.
+  const ids = captured.filter((c) => c.type === 'linearGradient').map((c) => c.props.id);
+  assert.equal(new Set(ids).size, 3);
+  for (const id of ids) assert.match(id, /glLoadBar\d-/);
+  const fills = captured.filter((c) => c.type === 'rect' && String(c.props.fill ?? '').startsWith('url(')).map((c) => c.props.fill);
+  for (const fill of fills) {
+    const ref = fill.slice(5, -1);
+    assert.ok(ids.includes(ref), `fill ${fill} refers to a defined gradient`);
+  }
+});
+
+test('the art is fully filled, with no thin outline styling', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8');
+  const css = src.slice(src.indexOf('const css = `'), src.indexOf('const pad2'));
+  // Every animated part must be present in the stylesheet, and motion must be optional.
+  for (const name of ['gl-loadBar', 'gl-loadSleeper', 'gl-loadZzz', 'gl-loadFish', 'gl-loadBubble']) {
+    assert.ok(css.includes('.' + name), `${name} is styled`);
+  }
+  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/, 'motion can be disabled');
+  const reduceBlock = css.slice(css.indexOf('prefers-reduced-motion'));
+  for (const name of ['gl-loadBar', 'gl-loadFish']) assert.ok(reduceBlock.includes(name), `${name} respects reduced motion`);
+});
+
+test('waiting copy rotates on a timer and stops when inactive', async () => {
+  // Observe the hook's own contract: it reads state, advances it on the timer,
+  // and only subscribes when a rotation can actually happen.
+  const timers = [];
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  globalThis.setInterval = (fn) => (timers.push(fn), timers.length);
+  globalThis.clearInterval = () => {};
+  try {
+    let current = 0;
+    const applied = [];
+    const React = {
+      ...fakeReact(),
+      useState: (initial) => {
+        // A real setter always advances from the latest state, not the closed-over one.
+        current = typeof initial === 'function' ? initial() : initial;
+        return [current, (next) => {
+          current = typeof next === 'function' ? next(current) : next;
+          applied.push(current);
+        }];
+      },
+      useEffect: (fn) => {
+        fn();
+      },
+    };
+    const mod = await loadClient({ react: React });
+    const lines = ['正在统计…', '正在翻 git 账本…', '正在数你今天敲了多少行…'];
+    const shown = mod.__test.useRotatingText(lines, 2400, true);
+    assert.equal(shown, lines[0], 'starts at the first line');
+    assert.equal(timers.length, 1, 'subscribes once while active');
+
+    // Firing the tick advances to the next line; it wraps back to the start.
+    timers[0]();
+    assert.equal(applied.at(-1), 1, 'advances the index by one');
+    timers[0]();
+    assert.equal(applied.at(-1), 2);
+    timers[0]();
+    assert.equal(applied.at(-1), 0, 'wraps around after the last line');
+
+    // An inactive rotation or a single-line list subscribes to nothing.
+    timers.length = 0;
+    mod.__test.useRotatingText(['only one'], 2400, true);
+    assert.equal(timers.length, 0, 'a single line needs no timer');
+    mod.__test.useRotatingText(lines, 2400, false);
+    assert.equal(timers.length, 0, 'inactive rotation needs no timer');
+  } finally {
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+  }
+});
+
+test('folder import shows art plus a real progress bar', async () => {
+  const captured = [];
+  const React = {
+    ...fakeReact(),
+    createElement: (type, props, ...kids) => {
+      const node = { type, props: { ...props, children: kids.length === 1 ? kids[0] : kids } };
+      captured.push(node);
+      return node;
+    },
+  };
+  const mod = await loadClient({ react: React });
+  mod.__test.SkinModal({
+    skin: 'default', onSkin() {}, daily: false, onDaily() {}, hasManual: false, poolCount: 0,
+    importState: { done: 3, total: 12 }, message: '',
+    onUpload() {}, onFolder() {}, onClearManual() {}, onClearPool() {}, onClose() {}, t: (k) => k,
+  });
+  const bar = captured.find((c) => c.props.role === 'progressbar');
+  assert.ok(bar, 'a progressbar is rendered while importing');
+  assert.equal(bar.props['aria-valuenow'], 3);
+  assert.equal(bar.props['aria-valuemax'], 12);
+  const fill = captured.find((c) => String(c.props.className ?? '') === 'gl-progressFill');
+  assert.equal(fill.props.style.width, '25%', 'quarter done');
+  // A nested component is an element here, not expanded markup.
+  assert.ok(captured.some((c) => typeof c.type === 'function' && c.type.name === 'LoadingGlyph'), 'the themed art accompanies it');
+});
+
 test('repos without git identity are named in mine reports', () => {
   const extra = { ...data, repos: [...data.repos, { key: 'c', title: 'repo-c', ok: true, me: null, stats: stats(1, 1), mine: stats(0, 0), commits: [] }] };
   assert.ok(T.buildReport(t, 'daily', extra, 'mine', 'plain', { style: 'worklog' }).includes('repo-c'));
