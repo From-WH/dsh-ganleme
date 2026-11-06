@@ -1009,11 +1009,11 @@ window.__ModuleLoader__.load({
      * restarts at 1 under each, which is how paper reports are written.
      */
     const NUMBERING = {
-      dash: { indent: '   ', marker: () => '-' },
-      bullet: { indent: '   ', marker: () => '•' },
-      numbered: { indent: '   ', marker: (i) => `${i + 1}.` },
-      paren: { indent: '   ', marker: (i) => `${i + 1}）` },
-      none: { indent: '   ', marker: () => '' },
+      dash: { indent: '  ', marker: () => '-' },
+      bullet: { indent: '  ', marker: () => '•' },
+      numbered: { indent: '  ', marker: (i) => `${i + 1}.` },
+      paren: { indent: '  ', marker: (i) => `${i + 1}）` },
+      none: { indent: '  ', marker: () => '' },
     };
     const NUMBERING_ORDER = ['dash', 'bullet', 'numbered', 'paren', 'none'];
 

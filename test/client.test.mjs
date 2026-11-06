@@ -194,14 +194,14 @@ test('one repository drops the heading and starts items at column 0', () => {
   const multi = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', numbering: 'numbered' });
   assert.ok(/^repo-a$/m.test(multi), 'repository heading kept, without a number');
   assert.ok(!/^\d+\. repo-a/m.test(multi), 'no number in front of the repository name');
-  assert.ok(multi.includes('   1. '), 'items indent under a heading');
+  assert.ok(multi.includes('  1. '), 'items indent under a heading');
 });
 
 test('numbering restarts per repository and Markdown falls back to its own markers', () => {
   const multi = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', numbering: 'numbered' });
   const groups = multi.split(/\nrepo-/).slice(1);
   assert.equal(groups.length, 2);
-  for (const group of groups) assert.ok(group.includes('   1. '), 'each repository restarts at 1');
+  for (const group of groups) assert.ok(group.includes('  1. '), 'each repository restarts at 1');
   const paren = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'worklog', numbering: 'paren' });
   assert.ok(/^- /.test(paren.split('\n').find((l) => l.includes('重命名'))), 'Markdown keeps dash');
   const numbered = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'worklog', numbering: 'numbered' });
