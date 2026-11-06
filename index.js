@@ -305,7 +305,16 @@ async function expandHome(path) {
  * levels, skipping hidden entries and bounding total directories visited.
  */
 export async function listRepos(ctx, config) {
-  const excluded = (config.excludedPaths ?? []).map((p) => p.replace(/[\\/]+$/, ''));
+  // Compare like with like: repository paths are canonical (realpath), so
+  // expand ~ and resolve symlinks in the exclusions too.
+  const excluded = [];
+  for (const raw of config.excludedPaths ?? []) {
+    const expanded = (await expandHome(String(raw).trim())).replace(/[\\/]+$/, '');
+    if (!expanded) continue;
+    excluded.push(expanded);
+    const canon = await realpath(expanded).catch(() => null);
+    if (canon && canon !== expanded) excluded.push(canon);
+  }
   const isExcluded = (path) =>
     excluded.some((x) => path === x || path.startsWith(x + sep) || path.startsWith(x + '/'));
   const repos = [];
@@ -403,6 +412,15 @@ export function identityMatcher(me) {
   return ({ name }) => name === me.name;
 }
 
+/** `rev-parse --abbrev-ref HEAD` says "HEAD" when detached; name the commit then. */
+function branchLabel(branchRun, headRun) {
+  const name = branchRun.ok ? branchRun.stdout.trim() : '';
+  if (!name) return null;
+  if (name !== 'HEAD') return name;
+  const sha = headRun.ok ? headRun.stdout.trim().slice(0, 7) : '';
+  return sha ? `detached@${sha}` : 'detached';
+}
+
 async function repoStats(git, repo, window, config) {
   const args = [
     '-C', repo.path,
@@ -443,7 +461,7 @@ async function repoStats(git, repo, window, config) {
     ...repo,
     ok: true,
     me,
-    branch: branchRun.ok ? branchRun.stdout.trim() || null : null,
+    branch: branchLabel(branchRun, head),
     stats: aggregate(commits),
     mine: aggregate(commits.filter((commit) => commit.mine)),
     commits: commits.slice(0, COMMIT_LIST_CAP),

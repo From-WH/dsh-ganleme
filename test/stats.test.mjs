@@ -158,6 +158,36 @@ test('many repositories are all read under the concurrency limit', async () => {
   assert.deepEqual(json.repos.map((r) => r.title), list.map((w) => w.title), 'order is preserved');
 });
 
+test('a detached checkout names its commit instead of "HEAD"', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'one', date: at(-2, '09:00') });
+  const second = commit(repo, { message: 'two', date: at(-2, '10:00') });
+  git(repo, ['checkout', '-q', '--detach', second]);
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  const r = (await stats(call, { from: D, to: D })).json.repos[0];
+  assert.equal(r.branch, `detached@${second.slice(0, 7)}`);
+});
+
+test('excludedPaths accepts ~ and symlinked paths', async () => {
+  const { mkdirSync, symlinkSync } = await import('node:fs');
+  const real = `${SANDBOX}/exclude-real`;
+  mkdirSync(real, { recursive: true });
+  const inner = `${real}/kept`;
+  mkdirSync(inner, { recursive: true });
+  git(inner, ['init', '-q']);
+  commit(inner, { date: at(-2) });
+  const link = `${SANDBOX}/exclude-link`;
+  symlinkSync(real, link);
+  const viaLink = await makeHost({ config: { extraRoots: [real], excludedPaths: [link] } });
+  assert.equal((await stats(viaLink.call, { from: D, to: D })).json.repos.length, 0, 'symlink exclusion applies');
+  const home = process.env.HOME;
+  mkdirSync(`${home}/proj`, { recursive: true });
+  git(`${home}/proj`, ['init', '-q']);
+  commit(`${home}/proj`, { date: at(-2) });
+  const viaTilde = await makeHost({ config: { extraRoots: [home], excludedPaths: ['~/proj'] } });
+  assert.equal((await stats(viaTilde.call, { from: D, to: D })).json.repos.length, 0, '~ exclusion applies');
+});
+
 test('custom ranges are validated', async () => {
   const { call } = await makeHost();
   assert.equal((await stats(call, { from: day(-1), to: day(-5) })).status, 400);
