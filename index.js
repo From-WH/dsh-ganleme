@@ -471,22 +471,37 @@ export function apply(ctx, config) {
     };
   })();
 
-  /** range -> { expires, promise }; `refresh` re-runs git and restarts the TTL. */
+  /** range -> { expires, promise, fp }; `refresh` re-runs git and restarts the TTL. */
   const statsCache = new Map();
   let reposCache = null;
 
+  /** Cheap in-memory fingerprint of the workspace registry: any add/remove/
+   *  rename produces a different string, which instantly invalidates caches. */
+  const workspaceFingerprint = () => {
+    try {
+      return (ctx.workspaceRegistry.list() ?? [])
+        .map((w) => `${w?.path ?? ''}|${w?.title ?? ''}`)
+        .sort()
+        .join('\n');
+    } catch {
+      return '';
+    }
+  };
+
   const cachedRepos = (refresh) => {
     const now = Date.now();
-    if (!refresh && reposCache && reposCache.expires > now) return reposCache.promise;
+    const fp = workspaceFingerprint();
+    if (!refresh && reposCache && reposCache.expires > now && reposCache.fp === fp) return reposCache.promise;
     const promise = listRepos(ctx, config);
-    reposCache = { expires: now + REPOS_CACHE_MS, promise };
+    reposCache = { expires: now + REPOS_CACHE_MS, promise, fp };
     return promise;
   };
 
   const cachedStats = (range, refresh) => {
     const now = Date.now();
+    const fp = workspaceFingerprint();
     const hit = statsCache.get(range);
-    if (!refresh && hit && hit.expires > now) return hit.promise;
+    if (!refresh && hit && hit.expires > now && hit.fp === fp) return hit.promise;
     const promise = (async () => {
       const window = windowFor(range, new Date());
       const repos = await cachedRepos(refresh);
@@ -503,7 +518,7 @@ export function apply(ctx, config) {
         repos: results,
       };
     })();
-    statsCache.set(range, { expires: now + Math.max(5_000, config.cacheMs), promise });
+    statsCache.set(range, { expires: now + Math.max(5_000, config.cacheMs), promise, fp });
     return promise;
   };
 
