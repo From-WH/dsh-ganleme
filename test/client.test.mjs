@@ -56,9 +56,10 @@ test('worklog style: what was done only, no prefix, time, or line counts', () =>
   assert.ok(text.startsWith('日报 · 2026-11-05'), 'keeps the date');
   assert.ok(!text.includes('统计范围'), 'no range line');
   assert.ok(!text.includes('一、总览') && !text.includes('二、分仓库明细'), 'no section headings');
-  assert.ok(text.includes('1. repo-a'));
-  assert.ok(text.includes('   - 重命名'), 'refactor: prefix is stripped');
-  assert.ok(text.includes('   - 修复'), 'fix: prefix is stripped');
+  // Only repo-a has commits in the "mine" scope, so no repository heading.
+  assert.ok(!text.includes('1. repo-a'), 'single active repo needs no heading');
+  assert.ok(text.includes('- 重命名'), 'refactor: prefix is stripped');
+  assert.ok(text.includes('- 修复'), 'fix: prefix is stripped');
   assert.ok(!text.includes('+0/-0') && !text.includes('新增'), 'line counts are gone');
   assert.ok(!text.includes('15:40'), 'no commit times');
   assert.ok(!text.includes('张三'), 'author toggle off by default');
@@ -118,6 +119,58 @@ test('the commit limit caps each repository and says how many are hidden', () =>
   const all = T.buildReport(t, 'daily', many, 'mine', 'plain', { style: 'worklog', limit: 0 });
   assert.equal((all.match(/改变 /g) ?? []).length, 25, 'limit 0 shows everything');
   assert.ok(!all.includes('未展示'));
+});
+
+test('numbering styles render their own markers', () => {
+  const one = {
+    ...data,
+    totals: { ...stats(3, 3), repos: 1 },
+    mine: { ...stats(3, 3), repos: 1 },
+    repos: [{
+      ...data.repos[0],
+      stats: stats(3, 3), mine: stats(3, 3),
+      commits: [
+        commit('h1', '修复登录', '张三', '2026-11-04T15:40:00.000Z', true, 2),
+        commit('h2', '新增导出', '张三', '2026-11-04T14:10:00.000Z', true, 1),
+        commit('h3', '优化查询', '张三', '2026-11-04T11:00:00.000Z', true, 0),
+      ],
+    }],
+  };
+  const body = (numbering) => T.buildReport(t, 'daily', one, 'mine', 'plain', { style: 'worklog', numbering })
+    .split('\n')
+    .filter((line) => /修复登录|新增导出|优化查询/.test(line));
+  assert.deepEqual(body('dash').map((l) => l.trim()), ['- 修复登录', '- 新增导出', '- 优化查询']);
+  assert.deepEqual(body('bullet').map((l) => l.trim()), ['• 修复登录', '• 新增导出', '• 优化查询']);
+  assert.deepEqual(body('numbered').map((l) => l.trim()), ['1. 修复登录', '2. 新增导出', '3. 优化查询']);
+  assert.deepEqual(body('paren').map((l) => l.trim()), ['1） 修复登录', '2） 新增导出', '3） 优化查询']);
+  assert.deepEqual(body('cn').map((l) => l.trim()), ['一、修复登录', '二、新增导出', '三、优化查询']);
+  assert.deepEqual(body('none').map((l) => l.trim()), ['修复登录', '新增导出', '优化查询']);
+});
+
+test('one repository drops the heading and starts items at column 0', () => {
+  const one = {
+    ...data,
+    totals: { ...stats(2, 1), repos: 1 },
+    mine: { ...stats(2, 1), repos: 1 },
+    repos: [data.repos[0]],
+  };
+  const text = T.buildReport(t, 'daily', one, 'mine', 'plain', { style: 'worklog', numbering: 'numbered' });
+  assert.ok(!/1\. repo-a/.test(text), 'no repository heading for a single repo');
+  assert.ok(text.includes('\n1. 重命名\n'), 'numbering starts at column 0');
+  const multi = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', numbering: 'numbered' });
+  assert.ok(/1\. repo-a/.test(multi), 'heading kept when several repos');
+  assert.ok(multi.includes('   1. '), 'items indent under a heading');
+});
+
+test('numbering restarts per repository and Markdown falls back to its own markers', () => {
+  const multi = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', numbering: 'numbered' });
+  const groups = multi.split(/\n\d+\. repo-/).slice(1);
+  assert.equal(groups.length, 2);
+  for (const group of groups) assert.ok(group.includes('   1. '), 'each repository restarts at 1');
+  const paren = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'worklog', numbering: 'paren' });
+  assert.ok(/^- /.test(paren.split('\n').find((l) => l.includes('重命名'))), 'Markdown keeps dash');
+  const numbered = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'worklog', numbering: 'numbered' });
+  assert.ok(/^1\. /.test(numbered.split('\n').find((l) => l.includes('重命名'))), 'Markdown can number');
 });
 
 test('commit prefixes are stripped only when they are real type tags', () => {

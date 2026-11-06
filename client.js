@@ -114,6 +114,13 @@ window.__ModuleLoader__.load({
       'report.toggle.time.hint': '每条提交前显示时:分',
       'report.toggle.author': '显示提交人',
       'report.toggle.author.hint': '在每条提交后显示提交人（长报告容易忘记是谁写的）',
+      'report.numbering': '序号',
+      'report.numbering.dash': '- 横线',
+      'report.numbering.bullet': '• 圆点',
+      'report.numbering.numbered': '1. 数字',
+      'report.numbering.paren': '1）括号',
+      'report.numbering.cn': '一、中文',
+      'report.numbering.none': '无序号',
       'report.limit': '条数',
       'report.limit.all': '全部',
       'report.limit.n': '{n} 条',
@@ -255,6 +262,13 @@ window.__ModuleLoader__.load({
       'report.toggle.time.hint': 'Show hour:minute before each commit',
       'report.toggle.author': 'Show authors',
       'report.toggle.author.hint': 'Name the author after each commit',
+      'report.numbering': 'Markers',
+      'report.numbering.dash': 'Dash',
+      'report.numbering.bullet': 'Bullet',
+      'report.numbering.numbered': '1. Numbered',
+      'report.numbering.paren': '1) Parenthesised',
+      'report.numbering.cn': '一、 Chinese',
+      'report.numbering.none': 'No markers',
       'report.limit': 'Commits',
       'report.limit.all': 'All',
       'report.limit.n': '{n}',
@@ -746,6 +760,7 @@ window.__ModuleLoader__.load({
     const SKIN_STORAGE_KEY = 'dsh.ganleme.skin';
     const REPORT_STYLE_KEY = 'dsh.ganleme.reportStyle';
     const REPORT_LIMIT_KEY = 'dsh.ganleme.reportLimit';
+    const REPORT_NUMBERING_KEY = 'dsh.ganleme.reportNumbering';
     const BG_STORAGE_KEY = 'dsh.ganleme.bg';
     const BG_DAILY_KEY = 'dsh.ganleme.bgDaily';
     /** Folder imports land in IndexedDB: localStorage cannot hold a whole album. */
@@ -959,35 +974,72 @@ window.__ModuleLoader__.load({
       worklog: {
         date: true, range: false, headings: false, overviewLines: false, statsLine: false,
         repoHeading: true, branch: false, time: false, author: false,
-        lines: false, stripPrefix: true, bullet: '-',
+        lines: false, stripPrefix: true, numbering: 'dash',
       },
       // Worklog plus the per-repository commit count.
       brief: {
         date: true, range: false, headings: false, overviewLines: true, statsLine: false,
         repoHeading: true, branch: false, time: false, author: false,
-        lines: true, stripPrefix: true, bullet: '-',
+        lines: true, stripPrefix: true, numbering: 'numbered',
       },
       // Adds clock times and a statistics line per repository.
       standard: {
         date: true, range: true, headings: true, overviewLines: true, statsLine: true,
         repoHeading: true, branch: true, time: true, author: false,
-        lines: true, stripPrefix: false, bullet: '-',
+        lines: true, stripPrefix: false, numbering: 'numbered',
       },
       // Everything: authors, times, branches and line counts.
       detailed: {
         date: true, range: true, headings: true, overviewLines: true, statsLine: true,
         repoHeading: true, branch: true, time: true, author: true,
-        lines: true, stripPrefix: false, bullet: '-',
+        lines: true, stripPrefix: false, numbering: 'numbered',
       },
     };
     const REPORT_STYLE_ORDER = ['worklog', 'brief', 'standard', 'detailed'];
     /** Switches a user may flip on top of the chosen style. */
     const REPORT_TOGGLES = ['stripPrefix', 'lines', 'time', 'author'];
+    /** `numbering` is a separate choice, not a boolean switch. */
+    const REPORT_CHOICES = [...REPORT_TOGGLES, 'numbering'];
+
+    /**
+     * How commit lines are prefixed. `marker(i)` renders item `i` (0-based);
+     * `indent` is the plain-format depth applied under a repository heading.
+     * Numbering is per repository: a daily report listing three repositories
+     * restarts at 1 under each, which is how paper reports are written.
+     */
+    const NUMBERING = {
+      dash: { indent: '   ', marker: () => '-' },
+      bullet: { indent: '   ', marker: () => '•' },
+      numbered: { indent: '   ', marker: (i) => `${i + 1}.` },
+      paren: { indent: '', marker: (i) => `${i + 1}）` },
+      cn: { indent: '', marker: (i) => `${CN_NUMERALS[i] ?? String(i + 1)}、` },
+      none: { indent: '', marker: () => '' },
+    };
+    const NUMBERING_ORDER = ['dash', 'bullet', 'numbered', 'paren', 'cn', 'none'];
+    const CN_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
+      '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十'];
+
+    /** One commit line in the chosen numbering, without the subject. */
+    function formatCommitLine(commit, index, ctx) {
+      const { marker, indent } = NUMBERING[ctx.numbering] ?? NUMBERING.dash;
+      const label = marker(index);
+      const parts = [];
+      if (ctx.showAuthor) parts.push(commit.author);
+      if (ctx.time) parts.push(fmtTime(commit.time));
+      if (ctx.lines) parts.push(`+${commit.insertions}/-${commit.deletions}`);
+      const meta = parts.join(' ');
+      const body = `${commit.subject}${meta ? `（${meta}）` : ''}`;
+      if (!label) return `${indent}${body}`;
+      // `1.`, `1）` and `-`/`•` take one following space; `一、` already ends
+      // in a wide mark that carries its own spacing.
+      const sep = /^[0-9]+[.)）]$|^[-•]$/.test(label) ? ' ' : '';
+      return `${indent}${label}${sep}${body}`;
+    }
 
     const resolveReportSpec = (style, overrides = {}) => ({
       ...(REPORT_STYLES[style] ?? REPORT_STYLES.worklog),
       ...Object.fromEntries(
-        Object.entries(overrides).filter(([key]) => REPORT_TOGGLES.includes(key)),
+        Object.entries(overrides).filter(([key, value]) => REPORT_CHOICES.includes(key) && value !== undefined),
       ),
     });
 
@@ -998,10 +1050,14 @@ window.__ModuleLoader__.load({
      * @param scope 'mine' (only the caller's own commits) or 'all'.
      * @param format 'plain' (textarea-friendly, no Markdown syntax) or 'markdown'.
      * @param options { style, overrides, limit }; `limit` 0 means every commit.
+     *   `overrides.numbering` picks the commit marker (see NUMBERING).
      */
     function buildReport(t, kind, data, scope, format, options = {}) {
       const plain = format !== 'markdown';
-      const spec = resolveReportSpec(options.style ?? 'worklog', options.overrides);
+      const spec = resolveReportSpec(options.style ?? 'worklog', {
+        ...options.overrides,
+        ...(options.numbering ? { numbering: options.numbering } : {}),
+      });
       const limit = Number.isInteger(options.limit) && options.limit >= 0 ? options.limit : 20;
       const totals = scope === 'mine' ? data.mine : data.totals;
       const perRepo = (repo) => (scope === 'mine' ? repo.mine : repo.stats);
@@ -1038,17 +1094,21 @@ window.__ModuleLoader__.load({
         // Ticked on, every line names its author; in the "mine" scope that is
         // the caller themselves, which is exactly what the toggle promises.
         const showAuthor = !!spec.author;
+        // A report about one repository needs no heading above its list; the
+        // numbering style then decides whether items indent or start at column 0.
+        const showRepoHeadings = spec.repoHeading && active.length > 1;
         active.forEach((repo, index) => {
           const stats = perRepo(repo);
           const commits = repo.commits.filter((commit) => scope !== 'mine' || commit.mine);
           const shown = limit === 0 ? commits : commits.slice(0, limit);
 
-          if (spec.repoHeading) {
-            if (plain) {
-              lines.push(`${index + 1}. ${repo.title}${spec.branch && repo.branch ? `（${repo.branch}）` : ''}`);
-            } else {
-              lines.push(plain ? `${index + 1}. ${repo.title}` : `### ${repo.title}${spec.branch && repo.branch ? ` (${repo.branch})` : ''}`);
-            }
+          if (showRepoHeadings) {
+            lines.push(plain
+              ? `${index + 1}. ${repo.title}${spec.branch && repo.branch ? `（${repo.branch}）` : ''}`
+              : `### ${repo.title}${spec.branch && repo.branch ? ` (${repo.branch})` : ''}`);
+          } else if (!plain && spec.repoHeading && active.length === 1) {
+            // Markdown still needs a heading-looking anchor for the list.
+            lines.push(`### ${repo.title}${spec.branch && repo.branch ? ` (${repo.branch})` : ''}`);
           }
           if (spec.statsLine) {
             const line = fmt(t(spec.lines ? 'report.repoLine' : 'report.repoLineNoLines'), {
@@ -1060,21 +1120,31 @@ window.__ModuleLoader__.load({
             if (!plain) lines.push(line, '');
           }
 
-          for (const commit of shown) {
+          shown.forEach((commit, i) => {
             const subject = spec.stripPrefix ? stripCommitPrefix(commit.subject) : commit.subject;
-            const parts = [];
-            if (showAuthor) parts.push(commit.author);
-            if (spec.time) parts.push(fmtTime(commit.time));
-            if (spec.lines) parts.push(`+${commit.insertions}/-${commit.deletions}`);
-            const meta = parts.join(' ');
-
+            const line = formatCommitLine(
+              { ...commit, subject },
+              i,
+              {
+                numbering: spec.numbering,
+                showAuthor,
+                time: spec.time,
+                lines: spec.lines,
+              },
+            );
             if (plain) {
-              const indent = spec.repoHeading ? '   ' : '';
-              lines.push(`${indent}${spec.bullet} ${subject}${meta ? `（${meta}）` : ''}`);
+              lines.push(showRepoHeadings ? line : line.trimStart());
             } else {
-              lines.push(`- ${subject}${meta ? ` — ${meta}` : ''}`);
+              // Markdown only understands `1.` and `-`; other markers would
+              // render as literal text, so they fall back to a dash.
+              const parts = [];
+              if (showAuthor) parts.push(commit.author);
+              if (spec.time) parts.push(fmtTime(commit.time));
+              if (spec.lines) parts.push(`+${commit.insertions}/-${commit.deletions}`);
+              const marker = spec.numbering === 'numbered' ? `${i + 1}.` : '-';
+              lines.push(`${marker} ${subject}${parts.length ? ` — ${parts.join(' ')}` : ''}`);
             }
-          }
+          });
           const hidden = commits.length - shown.length;
           if (hidden > 0) {
             const note = fmt(t('report.truncatedCount'), { n: hidden });
@@ -1289,10 +1359,11 @@ window.__ModuleLoader__.load({
 
     function ReportModal({
       report, scope, onScope, format, onFormat, onClose, onCopy, copied, t,
-      style, onStyle, overrides, onToggle, limit, onLimit,
+      style, onStyle, overrides, onToggle, numbering, onNumbering, limit, onLimit,
     }) {
       const dialogRef = useDialogFocus();
-      const spec = resolveReportSpec(style, overrides);
+      const spec = resolveReportSpec(style, { ...overrides, numbering });
+      const plainFormat = format === 'plain';
       const disabled = !report.data;
       const group = (label, children) =>
         h(
@@ -1389,6 +1460,23 @@ window.__ModuleLoader__.load({
                     onClick: () => onLimit(n),
                   },
                   n === 0 ? t('report.limit.all') : fmt(t('report.limit.n'), { n }),
+                ),
+              ),
+            ),
+            group(
+              t('report.numbering'),
+              NUMBERING_ORDER.map((id) =>
+                h(
+                  'button',
+                  {
+                    key: id,
+                    className: 'gl-tab',
+                    'aria-pressed': spec.numbering === id,
+                    'data-active': spec.numbering === id,
+                    disabled: plainFormat,
+                    onClick: () => onNumbering(id),
+                  },
+                  t('report.numbering.' + id),
                 ),
               ),
             ),
@@ -1664,6 +1752,10 @@ window.__ModuleLoader__.load({
         return REPORT_STYLES[stored] ? stored : 'worklog';
       });
       const [reportOverrides, setReportOverrides] = React.useState({});
+      const [reportNumbering, setReportNumbering] = React.useState(() => {
+        const stored = readStored(REPORT_NUMBERING_KEY);
+        return NUMBERING[stored] ? stored : null; // null = follow the style
+      });
       const [reportLimit, setReportLimit] = React.useState(() => {
         const stored = Number(readStored(REPORT_LIMIT_KEY));
         return [0, 20, 50].includes(stored) ? stored : 20;
@@ -2088,12 +2180,12 @@ window.__ModuleLoader__.load({
       const rerenderReport = (prev, next) => {
         if (!prev || !prev.data) return prev;
         const options = {
-          style: reportStyle,
-          overrides: reportOverrides,
-          limit: reportLimit,
-          ...next,
+          style: next.style ?? reportStyle,
+          overrides: next.overrides ?? reportOverrides,
+          numbering: next.numbering !== undefined ? next.numbering : reportNumbering,
+          limit: next.limit ?? reportLimit,
         };
-        const opts = { style: options.style, overrides: options.overrides, limit: options.limit };
+        const opts = { style: options.style, overrides: options.overrides, numbering: options.numbering, limit: options.limit };
         return { ...prev, text: buildReport(t, prev.kind, prev.data, next.scope ?? reportScope, next.format ?? reportFormat, opts) };
       };
 
@@ -2105,7 +2197,7 @@ window.__ModuleLoader__.load({
         const url = entry.url ?? `ganleme/stats?range=${entry.range}`;
         const cached = cacheRef.current.get(key);
         setReportScope('mine');
-        const options = { style: reportStyle, overrides: reportOverrides, limit: reportLimit };
+        const options = { style: reportStyle, overrides: reportOverrides, numbering: reportNumbering, limit: reportLimit };
         if (cached) {
           setReport({ kind: entry.kind, data: cached, text: buildReport(t, entry.kind, cached, 'mine', reportFormat, options) });
           return;
@@ -2148,6 +2240,12 @@ window.__ModuleLoader__.load({
           setReport((current) => rerenderReport(current, { overrides: next }));
           return next;
         });
+      };
+
+      const changeReportNumbering = (next) => {
+        setReportNumbering(next);
+        writeStored(REPORT_NUMBERING_KEY, next);
+        setReport((prev) => rerenderReport(prev, { numbering: next }));
       };
 
       const changeReportLimit = (next) => {
@@ -2403,6 +2501,8 @@ window.__ModuleLoader__.load({
                 onStyle: changeReportStyle,
                 overrides: reportOverrides,
                 onToggle: changeReportToggle,
+                numbering: reportNumbering,
+                onNumbering: changeReportNumbering,
                 limit: reportLimit,
                 onLimit: changeReportLimit,
                 t,
@@ -2474,6 +2574,10 @@ window.__ModuleLoader__.load({
         REPORT_STYLES,
         REPORT_STYLE_ORDER,
         REPORT_TOGGLES,
+        REPORT_CHOICES,
+        NUMBERING,
+        NUMBERING_ORDER,
+        formatCommitLine,
         COMMIT_TYPES,
         loadManualBg,
         manualBgSet,
