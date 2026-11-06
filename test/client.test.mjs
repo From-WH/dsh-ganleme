@@ -190,6 +190,39 @@ test('the page reads the language from the locale service', async () => {
   assert.equal(opts.inject().localeId(), 'en');
 });
 
+test('dialogs take focus, keep Tab inside, and give focus back', async () => {
+  const effects = [];
+  const react = { ...fakeReact(), useEffect: (fn) => effects.push(fn), useRef: (v) => ({ current: v }) };
+  const mod = await loadClient({ react });
+  const el = (name) => ({ name, focus() { globalThis.document.activeElement = this; } });
+  const opener = el('opener');
+  const [first, middle, last] = [el('first'), el('middle'), el('last')];
+  const listeners = {};
+  const dialog = {
+    ...el('dialog'),
+    querySelectorAll: () => [first, middle, last],
+    contains: (node) => [first, middle, last, dialog].includes(node),
+    addEventListener: (type, fn) => (listeners[type] = fn),
+    removeEventListener: (type) => delete listeners[type],
+  };
+  globalThis.document = { activeElement: opener, contains: () => true };
+  const ref = mod.__test.useDialogFocus();
+  ref.current = dialog;
+  const cleanup = effects.at(-1)();
+  assert.equal(document.activeElement, first, 'focus moves into the dialog');
+  let prevented = false;
+  document.activeElement = last;
+  listeners.keydown({ key: 'Tab', shiftKey: false, preventDefault: () => (prevented = true) });
+  assert.equal(document.activeElement, first, 'Tab wraps from last to first');
+  assert.ok(prevented);
+  listeners.keydown({ key: 'Tab', shiftKey: true, preventDefault() {} });
+  assert.equal(document.activeElement, last, 'Shift+Tab wraps from first to last');
+  cleanup();
+  assert.equal(document.activeElement, opener, 'focus returns to the opener');
+  assert.equal(listeners.keydown, undefined);
+  delete globalThis.document;
+});
+
 test('dashboard renders in every range including custom', async () => {
   for (const range of ['today', 'custom']) {
     const mod = await loadClient({ react: fakeReact({ 0: range }) });

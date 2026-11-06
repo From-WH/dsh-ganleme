@@ -1110,7 +1110,49 @@ window.__ModuleLoader__.load({
     }
 
     /** The report modal: generated report with scope/format/level toggles and copy. */
+    const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
+    /**
+     * Modal focus: move focus into the dialog when it opens, keep Tab and
+     * Shift+Tab inside it, and give focus back to the opener when it closes.
+     */
+    function useDialogFocus() {
+      const ref = React.useRef(null);
+      React.useEffect(() => {
+        const dialog = ref.current;
+        if (!dialog) return undefined;
+        const opener = typeof document !== 'undefined' ? document.activeElement : null;
+        const items = () => Array.from(dialog.querySelectorAll(FOCUSABLE));
+        (items()[0] ?? dialog).focus?.();
+        const onKey = (e) => {
+          if (e.key !== 'Tab') return;
+          const list = items();
+          if (list.length === 0) {
+            e.preventDefault();
+            return;
+          }
+          const first = list[0];
+          const last = list[list.length - 1];
+          const active = document.activeElement;
+          if (e.shiftKey && (active === first || !dialog.contains(active))) {
+            e.preventDefault();
+            last.focus();
+          } else if (!e.shiftKey && (active === last || !dialog.contains(active))) {
+            e.preventDefault();
+            first.focus();
+          }
+        };
+        dialog.addEventListener('keydown', onKey);
+        return () => {
+          dialog.removeEventListener('keydown', onKey);
+          if (opener && typeof opener.focus === 'function' && document.contains?.(opener)) opener.focus();
+        };
+      }, []);
+      return ref;
+    }
+
     function ReportModal({ report, scope, onScope, format, onFormat, brief, onBrief, onClose, onCopy, copied, t }) {
+      const dialogRef = useDialogFocus();
       return h(
         'div',
         {
@@ -1121,7 +1163,7 @@ window.__ModuleLoader__.load({
         },
         h(
           'div',
-          { className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('report.title.' + report.kind) },
+          { ref: dialogRef, tabIndex: -1, className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('report.title.' + report.kind) },
           h(
             'div',
             { className: 'gl-modalHead' },
@@ -1209,6 +1251,7 @@ window.__ModuleLoader__.load({
     }) {
       const fileRef = React.useRef(null);
       const folderRef = React.useRef(null);
+      const dialogRef = useDialogFocus();
       const busy = !!importState;
       return h(
         'div',
@@ -1220,7 +1263,7 @@ window.__ModuleLoader__.load({
         },
         h(
           'div',
-          { className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('skin.title') },
+          { ref: dialogRef, tabIndex: -1, className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('skin.title') },
           h(
             'div',
             { className: 'gl-modalHead' },
@@ -1367,6 +1410,7 @@ window.__ModuleLoader__.load({
 
     /** Project-sources popover: pick directories and manage the extra roots. */
     function ProjectsModal({ roots, busy, message, onAdd, onRemove, onClose, t }) {
+      const dialogRef = useDialogFocus();
       return h(
         'div',
         {
@@ -1377,7 +1421,7 @@ window.__ModuleLoader__.load({
         },
         h(
           'div',
-          { className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('projects.title') },
+          { ref: dialogRef, tabIndex: -1, className: 'gl-modal', role: 'dialog', 'aria-modal': true, 'aria-label': t('projects.title') },
           h(
             'div',
             { className: 'gl-modalHead' },
@@ -2192,6 +2236,7 @@ window.__ModuleLoader__.load({
         imageFiles,
         fmtDate,
         createStatsCache,
+        useDialogFocus,
         loadManualBg,
         manualBgSet,
         manualBgGet,
