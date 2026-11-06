@@ -47,6 +47,8 @@ export const Config = z.object({
   excludedPaths: z.array(z.string()).default([]),
   /** How many directory levels below a root to search for git repositories. */
   scanDepth: z.number().min(1).max(3).default(1),
+  /** Count merge commits too; off by default since they carry no work of their own. */
+  includeMerges: z.boolean().default(false),
   /** Maximum commits read per repository per query. */
   commitLimit: z.number().default(5000),
   /** How long statistics stay cached before git runs again (ms). */
@@ -392,6 +394,7 @@ async function repoStats(git, repo, window, config) {
     // up the commitLimit before git reaches the requested window.
     '--until=' + isoLocal(addDays(window.to, REWRITE_BUFFER_DAYS)),
     `--max-count=${Math.max(1, config.commitLimit)}`,
+    ...(config.includeMerges ? [] : ['--no-merges']),
   ];
   const [logRun, branchRun, me] = await Promise.all([
     runGit(git, args, repo.path, GIT_TIMEOUT_MS),

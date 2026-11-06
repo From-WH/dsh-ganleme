@@ -69,6 +69,28 @@ test('a rebased commit counts on the day it was written', async () => {
   assert.equal(rewrittenDay.json.totals.commits, 0, 'not double-counted on the rebase day');
 });
 
+/** main + merged feature branch + merge commit, all on day D. */
+function mergedRepo() {
+  const repo = makeRepo();
+  commit(repo, { message: 'base', date: at(-9) });
+  git(repo, ['checkout', '-q', '-b', 'feature']);
+  commit(repo, { message: 'feature work', date: at(-2, '09:00') });
+  git(repo, ['checkout', '-q', 'main']);
+  commit(repo, { message: 'main work', date: at(-2, '10:00') });
+  const when = at(-2, '11:00');
+  git(repo, ['merge', '-q', '--no-ff', 'feature', '-m', 'Merge branch feature'], { GIT_AUTHOR_DATE: when, GIT_COMMITTER_DATE: when });
+  return repo;
+}
+
+test('merge commits are not counted by default', async () => {
+  const repo = mergedRepo();
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  const { json } = await stats(call, { from: D, to: D });
+  assert.deepEqual(json.repos[0].commits.map((c) => c.subject).sort(), ['feature work', 'main work']);
+  const withMerges = await makeHost({ workspaces: [{ path: repo, title: 'r' }], config: { includeMerges: true } });
+  assert.equal((await stats(withMerges.call, { from: D, to: D })).json.repos[0].stats.commits, 3);
+});
+
 test('a past window is bounded by --until even with a tiny commitLimit', async () => {
   const repo = makeRepo();
   commit(repo, { message: 'in window', date: at(-45) });
