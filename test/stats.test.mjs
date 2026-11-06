@@ -91,6 +91,39 @@ test('merge commits are not counted by default', async () => {
   assert.equal((await stats(withMerges.call, { from: D, to: D })).json.repos[0].stats.commits, 3);
 });
 
+test('work on an unmerged local branch is counted once', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'base', date: at(-9) });
+  git(repo, ['checkout', '-q', '-b', 'wip']);
+  commit(repo, { message: 'wip on branch', date: at(-2) });
+  git(repo, ['checkout', '-q', '-b', 'wip-copy']); // same commit reachable from two branches
+  git(repo, ['checkout', '-q', 'main']);
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  const { json } = await stats(call, { from: D, to: D });
+  assert.deepEqual(json.repos[0].commits.map((c) => c.subject), ['wip on branch']);
+  const headOnly = await makeHost({ workspaces: [{ path: repo, title: 'r' }], config: { allBranches: false } });
+  assert.equal((await stats(headOnly.call, { from: D, to: D })).json.repos[0].stats.commits, 0);
+});
+
+test('a repository without commits is empty, not an error', async () => {
+  const repo = makeRepo();
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  const r = (await stats(call, { from: D, to: D })).json.repos[0];
+  assert.equal(r.ok, true, r.error);
+  assert.equal(r.stats.commits, 0);
+});
+
+test('a broken repository is still reported as an error', async () => {
+  const { mkdirSync, writeFileSync } = await import('node:fs');
+  const dir = `${SANDBOX}/broken-repo`;
+  mkdirSync(`${dir}/.git`, { recursive: true });
+  writeFileSync(`${dir}/.git/HEAD`, 'garbage\n');
+  const { call } = await makeHost({ workspaces: [{ path: dir, title: 'broken' }] });
+  const r = (await stats(call, { from: D, to: D })).json.repos[0];
+  assert.equal(r.ok, false);
+  assert.ok(r.error);
+});
+
 test('a past window is bounded by --until even with a tiny commitLimit', async () => {
   const repo = makeRepo();
   commit(repo, { message: 'in window', date: at(-45) });

@@ -49,6 +49,8 @@ export const Config = z.object({
   scanDepth: z.number().min(1).max(3).default(1),
   /** Count merge commits too; off by default since they carry no work of their own. */
   includeMerges: z.boolean().default(false),
+  /** Read every local branch, not only the checked-out one. */
+  allBranches: z.boolean().default(true),
   /** Maximum commits read per repository per query. */
   commitLimit: z.number().default(5000),
   /** How long statistics stay cached before git runs again (ms). */
@@ -166,7 +168,11 @@ function runGit(git, args, cwd, timeoutMs) {
   return new Promise((resolve) => {
     execFile(git, args, { cwd, timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024, windowsHide: true }, (error, stdout, stderr) => {
       if (error) {
-        resolve({ ok: false, error: String(stderr || error.message || 'git failed').trim().slice(0, 300) });
+        resolve({
+          ok: false,
+          stderr: String(stderr ?? '').trim(),
+          error: String(stderr || error.message || 'git failed').trim().slice(0, 300),
+        });
       } else {
         resolve({ ok: true, stdout: String(stdout) });
       }
@@ -395,7 +401,17 @@ async function repoStats(git, repo, window, config) {
     '--until=' + isoLocal(addDays(window.to, REWRITE_BUFFER_DAYS)),
     `--max-count=${Math.max(1, config.commitLimit)}`,
     ...(config.includeMerges ? [] : ['--no-merges']),
+    // Work on unmerged local branches belongs in the report too; git lists a
+    // commit reachable from several refs once. HEAD covers a detached checkout.
+    ...(config.allBranches ? ['--branches', 'HEAD'] : []),
   ];
+  // A repository without commits has no HEAD; every git log form then fails
+  // (git 2.37 ignores --ignore-missing for HEAD). Answer it as empty, but keep
+  // reporting real failures: those print to stderr, a missing HEAD does not.
+  const head = await runGit(git, ['-C', repo.path, 'rev-parse', '--verify', '--quiet', 'HEAD'], repo.path, 10_000);
+  if (!head.ok && !head.stderr) {
+    return { ...repo, ok: true, me: null, branch: null, stats: aggregate([]), mine: aggregate([]), commits: [], commitsTotal: 0, truncated: false };
+  }
   const [logRun, branchRun, me] = await Promise.all([
     runGit(git, args, repo.path, GIT_TIMEOUT_MS),
     runGit(git, ['-C', repo.path, 'rev-parse', '--abbrev-ref', 'HEAD'], repo.path, 10_000),
