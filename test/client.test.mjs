@@ -494,6 +494,31 @@ test('the rotation deck shuffles and never repeats within a cycle', async () => 
   }
 });
 
+test('waiting text is gradient-coloured with a sweeping highlight', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8');
+  const css = src.slice(src.indexOf('const css = `'), src.indexOf('const pad2'));
+  const block = css.slice(css.indexOf('.gl-loadText'), css.indexOf('@keyframes gl-sheen'));
+  assert.match(block, /background-image:linear-gradient/, 'text is painted with a gradient');
+  assert.match(block, /background-clip:text/, 'the gradient is clipped to the glyphs');
+  assert.match(block, /animation:gl-sheen/, 'the highlight moves, so it reads as loading');
+  assert.match(css, /@keyframes gl-sheen/, 'the sweep is defined');
+
+  // Three fallbacks matter: no animation, no clip support, and a solid colour.
+  const reduce = css.slice(css.indexOf('prefers-reduced-motion'));
+  assert.match(reduce.slice(0, 200), /gl-loadText[^}]*animation:none/, 'stops moving when asked');
+  const supports = css.slice(css.indexOf('@supports not'));
+  assert.match(supports.slice(0, 260), /color:var\(--dsw-alias-brand-primary\)/, 'keeps a readable colour without clip support');
+});
+
+test('every waiting spot uses the same gradient text', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8');
+  const usages = [...src.matchAll(/className: 'gl-loadText'/g)].length;
+  assert.ok(usages >= 3, `stats, report and polish all use it (found ${usages})`);
+  assert.ok(!src.includes('LoadingGlyph'), 'no artwork returned alongside it');
+});
+
 test('the stats loader shows rotating text and no artwork', async () => {
   const captured = [];
   const React = {

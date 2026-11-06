@@ -751,8 +751,30 @@ window.__ModuleLoader__.load({
 .gl-emptyHint{margin:6px 0 0;font-size:12px;color:var(--dsw-alias-label-secondary)}
 
 }
-.gl-loadText{font-size:13px;line-height:19px;color:var(--dsw-alias-label-secondary)}
-.gl-preLoading .gl-loadText{font-size:13px}
+/* Waiting copy: a gradient fill with a highlight sweeping across it. The sweep
+   is what reads as "still working"; the colour keeps it in the plugin's palette. */
+.gl-loadText{font-size:13px;line-height:19px;font-weight:500;display:inline-block;
+  background-image:linear-gradient(100deg,
+    var(--dsw-alias-brand-primary) 0%,
+    #3fd0e0 22%,
+    #a78bfa 44%,
+    var(--dsw-alias-brand-primary) 66%,
+    #3fd0e0 88%,
+    var(--dsw-alias-brand-primary) 100%);
+  background-size:280% 100%;
+  -webkit-background-clip:text;background-clip:text;
+  color:transparent;-webkit-text-fill-color:transparent;
+  animation:gl-sheen 2.6s linear infinite}
+.gl-preLoading .gl-loadText{font-size:14px;letter-spacing:.01em}
+@keyframes gl-sheen{from{background-position:0% 50%}to{background-position:280% 50%}}
+/* Without animation the gradient still colours the text, so it never goes blank. */
+@media (prefers-reduced-motion: reduce){
+  .gl-loadText{animation:none;background-position:20% 50%}
+}
+/* A browser without background-clip:text keeps a readable solid colour. */
+@supports not ((-webkit-background-clip:text) or (background-clip:text)){
+  .gl-loadText{color:var(--dsw-alias-brand-primary);-webkit-text-fill-color:currentColor}
+}
 .gl-status{display:flex;align-items:center;gap:8px;padding:28px 4px;color:var(--dsw-alias-label-secondary);font-size:13px}
 .gl-dot{width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-brand-primary);animation:gl-pulse 1.2s ease-in-out infinite}
 .gl-dot[data-error="true"]{background:var(--dsw-alias-state-error-primary);animation:none}
