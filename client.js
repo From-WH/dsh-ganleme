@@ -104,7 +104,7 @@ window.__ModuleLoader__.load({
       'report.style.standard': '标准',
       'report.style.standard.hint': '带时间、分支和统计行',
       'report.style.detailed': '详细',
-      'report.style.detailed.hint': '全部信息：哈希、作者、行数',
+      'report.style.detailed.hint': '全部信息：作者、时间、分支、行数',
       'report.advanced': '高级',
       'report.toggle.stripPrefix': '去掉 fix/perf 等前缀',
       'report.toggle.stripPrefix.hint': '去掉提交说明开头的类型标签，如 fix: 修复登录',
@@ -113,9 +113,7 @@ window.__ModuleLoader__.load({
       'report.toggle.time': '显示提交时间',
       'report.toggle.time.hint': '每条提交前显示时:分',
       'report.toggle.author': '显示提交人',
-      'report.toggle.author.hint': '「全部人」时区分每条提交是谁写的',
-      'report.toggle.hash': '显示提交哈希',
-      'report.toggle.hash.hint': '显示 7 位短哈希（仅 Markdown）',
+      'report.toggle.author.hint': '在每条提交后显示提交人（长报告容易忘记是谁写的）',
       'report.limit': '条数',
       'report.limit.all': '全部',
       'report.limit.n': '{n} 条',
@@ -247,7 +245,7 @@ window.__ModuleLoader__.load({
       'report.style.standard': 'Standard',
       'report.style.standard.hint': 'Adds times, branch, and a statistics line',
       'report.style.detailed': 'Detailed',
-      'report.style.detailed.hint': 'Everything: hashes, authors, line counts',
+      'report.style.detailed.hint': 'Everything: authors, times, branch, line counts',
       'report.advanced': 'Advanced',
       'report.toggle.stripPrefix': 'Strip fix/perf prefixes',
       'report.toggle.stripPrefix.hint': 'Drop the type tag, e.g. "fix: login" becomes "login"',
@@ -256,9 +254,7 @@ window.__ModuleLoader__.load({
       'report.toggle.time': 'Show commit times',
       'report.toggle.time.hint': 'Show hour:minute before each commit',
       'report.toggle.author': 'Show authors',
-      'report.toggle.author.hint': 'Tell who wrote each commit when reporting everyone',
-      'report.toggle.hash': 'Show commit hashes',
-      'report.toggle.hash.hint': 'Show the 7-character short hash (Markdown only)',
+      'report.toggle.author.hint': 'Name the author after each commit',
       'report.limit': 'Commits',
       'report.limit.all': 'All',
       'report.limit.n': '{n}',
@@ -953,7 +949,7 @@ window.__ModuleLoader__.load({
      * Report styles as bundles of independent switches. A style only provides
      * defaults; `overrides` flips individual switches on top of it.
      *
-     * `date`/`range`/`headings`/`statsLine` shape the skeleton; `time`/`hash`/
+     * `date`/`range`/`headings`/`statsLine` shape the skeleton; `time`/
      * `author`/`lines`/`branch` shape one commit line; `stripPrefix` rewrites
      * the subject; `overviewLines` decides whether the summary sentence counts
      * added/deleted lines.
@@ -962,31 +958,31 @@ window.__ModuleLoader__.load({
       // The usual company daily-report entry: what was done, nothing else.
       worklog: {
         date: true, range: false, headings: false, overviewLines: false, statsLine: false,
-        repoHeading: true, branch: false, time: false, hash: false, author: false,
+        repoHeading: true, branch: false, time: false, author: false,
         lines: false, stripPrefix: true, bullet: '-',
       },
       // Worklog plus the per-repository commit count.
       brief: {
         date: true, range: false, headings: false, overviewLines: true, statsLine: false,
-        repoHeading: true, branch: false, time: false, hash: false, author: false,
+        repoHeading: true, branch: false, time: false, author: false,
         lines: true, stripPrefix: true, bullet: '-',
       },
       // Adds clock times and a statistics line per repository.
       standard: {
         date: true, range: true, headings: true, overviewLines: true, statsLine: true,
-        repoHeading: true, branch: true, time: true, hash: false, author: false,
+        repoHeading: true, branch: true, time: true, author: false,
         lines: true, stripPrefix: false, bullet: '-',
       },
-      // Everything: hashes, authors and line counts.
+      // Everything: authors, times, branches and line counts.
       detailed: {
         date: true, range: true, headings: true, overviewLines: true, statsLine: true,
-        repoHeading: true, branch: true, time: true, hash: true, author: true,
+        repoHeading: true, branch: true, time: true, author: true,
         lines: true, stripPrefix: false, bullet: '-',
       },
     };
     const REPORT_STYLE_ORDER = ['worklog', 'brief', 'standard', 'detailed'];
     /** Switches a user may flip on top of the chosen style. */
-    const REPORT_TOGGLES = ['stripPrefix', 'lines', 'time', 'author', 'hash'];
+    const REPORT_TOGGLES = ['stripPrefix', 'lines', 'time', 'author'];
 
     const resolveReportSpec = (style, overrides = {}) => ({
       ...(REPORT_STYLES[style] ?? REPORT_STYLES.worklog),
@@ -1039,8 +1035,9 @@ window.__ModuleLoader__.load({
         lines.push(t('report.emptyBody'));
       } else {
         if (spec.headings) lines.push(plain ? t('report.detailPlain') : `## ${t('report.detail')}`);
-        // Author names only matter when the report covers everyone.
-        const showAuthor = spec.author && scope !== 'mine';
+        // Ticked on, every line names its author; in the "mine" scope that is
+        // the caller themselves, which is exactly what the toggle promises.
+        const showAuthor = !!spec.author;
         active.forEach((repo, index) => {
           const stats = perRepo(repo);
           const commits = repo.commits.filter((commit) => scope !== 'mine' || commit.mine);
@@ -1075,8 +1072,7 @@ window.__ModuleLoader__.load({
               const indent = spec.repoHeading ? '   ' : '';
               lines.push(`${indent}${spec.bullet} ${subject}${meta ? `（${meta}）` : ''}`);
             } else {
-              const head = spec.hash ? `\`${commit.hash}\` ` : '';
-              lines.push(`- ${head}${subject}${meta ? ` — ${meta}` : ''}`);
+              lines.push(`- ${subject}${meta ? ` — ${meta}` : ''}`);
             }
           }
           const hidden = commits.length - shown.length;

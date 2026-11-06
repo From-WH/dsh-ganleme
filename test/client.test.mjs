@@ -61,7 +61,7 @@ test('worklog style: what was done only, no prefix, time, or line counts', () =>
   assert.ok(text.includes('   - 修复'), 'fix: prefix is stripped');
   assert.ok(!text.includes('+0/-0') && !text.includes('新增'), 'line counts are gone');
   assert.ok(!text.includes('15:40'), 'no commit times');
-  assert.ok(!text.includes('张三'), 'mine scope omits the author');
+  assert.ok(!text.includes('张三'), 'author toggle off by default');
   assert.ok(!text.includes('repo-b'));
   assert.ok(!text.includes('#') && !text.includes('`'));
 });
@@ -74,7 +74,7 @@ test('detailed style keeps everything', () => {
   assert.ok(text.includes('（李四 11:00 +2/-0）'), 'author, time and lines kept');
   assert.ok(text.includes('refactor: 重命名'), 'prefix kept');
   const md = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'detailed' });
-  assert.ok(md.startsWith('# 日报') && md.includes('`e78ebb9`'));
+  assert.ok(md.startsWith('# 日报') && !md.includes('e78ebb9'), 'commit hashes are gone');
 });
 
 test('brief and standard styles sit between the two', () => {
@@ -93,6 +93,10 @@ test('toggles override a style without changing the skeleton', () => {
   assert.ok(!withLines.includes('15:40'), 'times still off');
   const withTimeAuthors = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', overrides: { time: true, author: true } });
   assert.ok(withTimeAuthors.includes('15:40') && withTimeAuthors.includes('张三'));
+  // The author toggle must work in the default "mine" scope too.
+  const mineAuthor = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'worklog', overrides: { author: true } });
+  assert.ok(mineAuthor.includes('张三'), 'author shown in mine scope when ticked');
+  assert.ok(!mineAuthor.includes('李四'));
   const keepPrefix = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'worklog', overrides: { stripPrefix: false } });
   assert.ok(keepPrefix.includes('refactor: 重命名'), 'prefix kept when the toggle is off');
   const noLines = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'detailed', overrides: { lines: false } });
