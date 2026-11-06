@@ -147,6 +147,41 @@ test('numbering styles render their own markers', () => {
   assert.deepEqual(body('none').map((l) => l.trim()), ['修复登录', '新增导出', '优化查询']);
 });
 
+test('numbering buttons are enabled for plain text and disabled for Markdown', async () => {
+  // Regression: the condition was inverted, so every marker button was disabled
+  // in the default plain-text format and numbering could not be changed.
+  const captured = [];
+  const React = { ...fakeReact(), createElement: (type, props, ...kids) => (captured.push({ type, props }), { type, props }) };
+  const mod = await loadClient({ react: React });
+  const render = (format) => {
+    captured.length = 0;
+    mod.__test.ReportModal({
+      report: { kind: 'daily', data: {}, text: 'x' },
+      scope: 'mine', onScope() {}, format, onFormat() {}, style: 'worklog', onStyle() {},
+      overrides: {}, onToggle() {}, numbering: 'dash', onNumbering() {}, limit: 20, onLimit() {},
+      onClose() {}, onCopy() {}, copied: false, t: (k) => k,
+    });
+    const marker = /^(dash|bullet|numbered|paren|cn|none)$/;
+    return captured.filter((c) => c.type === 'button' && marker.test(String(c.props.key)));
+  };
+  const plain = render('plain');
+  const markdown = render('markdown');
+  assert.equal(plain.length, 6, 'six marker buttons');
+  assert.ok(plain.every((b) => !b.props.disabled), 'clickable in the default plain format');
+  assert.ok(markdown.every((b) => b.props.disabled), 'disabled for Markdown');
+  // Clicking one must reach the handler with its id.
+  const seen = [];
+  captured.length = 0;
+  mod.__test.ReportModal({
+    report: { kind: 'daily', data: {}, text: 'x' },
+    scope: 'mine', onScope() {}, format: 'plain', onFormat() {}, style: 'worklog', onStyle() {},
+    overrides: {}, onToggle() {}, numbering: 'dash', onNumbering: (id) => seen.push(id), limit: 20,
+    onLimit() {}, onClose() {}, onCopy() {}, copied: false, t: (k) => k,
+  });
+  const cn = captured.find((c) => c.type === 'button' && c.props.key === 'cn');
+  cn.props.onClick();
+  assert.deepEqual(seen, ['cn']);
+});
 test('one repository drops the heading and starts items at column 0', () => {
   const one = {
     ...data,
