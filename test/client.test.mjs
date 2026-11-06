@@ -70,7 +70,7 @@ test('worklog style: what was done only, no prefix, time, or line counts', () =>
 test('detailed style keeps everything', () => {
   const text = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'detailed' });
   assert.ok(text.includes('统计范围') && text.includes('一、总览') && text.includes('二、分仓库明细'));
-  assert.ok(text.includes('1. repo-a（master）'), 'branch kept');
+  assert.ok(text.includes('repo-a（master）'), 'heading keeps the branch, without a number');
   assert.ok(text.includes('15:40'), 'time kept');
   assert.ok(text.includes('（李四 11:00 +2/-0）'), 'author, time and lines kept');
   assert.ok(text.includes('refactor: 重命名'), 'prefix kept');
@@ -143,7 +143,6 @@ test('numbering styles render their own markers', () => {
   assert.deepEqual(body('bullet').map((l) => l.trim()), ['• 修复登录', '• 新增导出', '• 优化查询']);
   assert.deepEqual(body('numbered').map((l) => l.trim()), ['1. 修复登录', '2. 新增导出', '3. 优化查询']);
   assert.deepEqual(body('paren').map((l) => l.trim()), ['1） 修复登录', '2） 新增导出', '3） 优化查询']);
-  assert.deepEqual(body('cn').map((l) => l.trim()), ['一、修复登录', '二、新增导出', '三、优化查询']);
   assert.deepEqual(body('none').map((l) => l.trim()), ['修复登录', '新增导出', '优化查询']);
 });
 
@@ -161,12 +160,12 @@ test('numbering buttons are enabled for plain text and disabled for Markdown', a
       overrides: {}, onToggle() {}, numbering: 'dash', onNumbering() {}, limit: 20, onLimit() {},
       onClose() {}, onCopy() {}, copied: false, t: (k) => k,
     });
-    const marker = /^(dash|bullet|numbered|paren|cn|none)$/;
+    const marker = /^(dash|bullet|numbered|paren|none)$/;
     return captured.filter((c) => c.type === 'button' && marker.test(String(c.props.key)));
   };
   const plain = render('plain');
   const markdown = render('markdown');
-  assert.equal(plain.length, 6, 'six marker buttons');
+  assert.equal(plain.length, 5, 'five marker buttons');
   assert.ok(plain.every((b) => !b.props.disabled), 'clickable in the default plain format');
   assert.ok(markdown.every((b) => b.props.disabled), 'disabled for Markdown');
   // Clicking one must reach the handler with its id.
@@ -178,9 +177,9 @@ test('numbering buttons are enabled for plain text and disabled for Markdown', a
     overrides: {}, onToggle() {}, numbering: 'dash', onNumbering: (id) => seen.push(id), limit: 20,
     onLimit() {}, onClose() {}, onCopy() {}, copied: false, t: (k) => k,
   });
-  const cn = captured.find((c) => c.type === 'button' && c.props.key === 'cn');
+  const cn = captured.find((c) => c.type === 'button' && c.props.key === 'paren');
   cn.props.onClick();
-  assert.deepEqual(seen, ['cn']);
+  assert.deepEqual(seen, ['paren']);
 });
 test('one repository drops the heading and starts items at column 0', () => {
   const one = {
@@ -193,13 +192,14 @@ test('one repository drops the heading and starts items at column 0', () => {
   assert.ok(!/1\. repo-a/.test(text), 'no repository heading for a single repo');
   assert.ok(text.includes('\n1. 重命名\n'), 'numbering starts at column 0');
   const multi = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', numbering: 'numbered' });
-  assert.ok(/1\. repo-a/.test(multi), 'heading kept when several repos');
+  assert.ok(/^repo-a$/m.test(multi), 'repository heading kept, without a number');
+  assert.ok(!/^\d+\. repo-a/m.test(multi), 'no number in front of the repository name');
   assert.ok(multi.includes('   1. '), 'items indent under a heading');
 });
 
 test('numbering restarts per repository and Markdown falls back to its own markers', () => {
   const multi = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', numbering: 'numbered' });
-  const groups = multi.split(/\n\d+\. repo-/).slice(1);
+  const groups = multi.split(/\nrepo-/).slice(1);
   assert.equal(groups.length, 2);
   for (const group of groups) assert.ok(group.includes('   1. '), 'each repository restarts at 1');
   const paren = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'worklog', numbering: 'paren' });

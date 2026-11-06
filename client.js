@@ -119,7 +119,6 @@ window.__ModuleLoader__.load({
       'report.numbering.bullet': '• 圆点',
       'report.numbering.numbered': '1. 数字',
       'report.numbering.paren': '1）括号',
-      'report.numbering.cn': '一、中文',
       'report.numbering.none': '无序号',
       'report.numbering.markdownOnly': 'Markdown 只支持「-」和「1.」，切到纯文本才能使用其他序号',
       'report.limit': '条数',
@@ -268,7 +267,6 @@ window.__ModuleLoader__.load({
       'report.numbering.bullet': 'Bullet',
       'report.numbering.numbered': '1. Numbered',
       'report.numbering.paren': '1) Parenthesised',
-      'report.numbering.cn': '一、 Chinese',
       'report.numbering.none': 'No markers',
       'report.numbering.markdownOnly': 'Markdown only supports "-" and "1."; switch to plain text for the others',
       'report.limit': 'Commits',
@@ -1005,7 +1003,8 @@ window.__ModuleLoader__.load({
 
     /**
      * How commit lines are prefixed. `marker(i)` renders item `i` (0-based);
-     * `indent` is the plain-format depth applied under a repository heading.
+     * `indent` is the plain-format depth under a repository heading. Items sit
+     * under their heading in every style, so a group always reads as one block.
      * Numbering is per repository: a daily report listing three repositories
      * restarts at 1 under each, which is how paper reports are written.
      */
@@ -1013,13 +1012,10 @@ window.__ModuleLoader__.load({
       dash: { indent: '   ', marker: () => '-' },
       bullet: { indent: '   ', marker: () => '•' },
       numbered: { indent: '   ', marker: (i) => `${i + 1}.` },
-      paren: { indent: '', marker: (i) => `${i + 1}）` },
-      cn: { indent: '', marker: (i) => `${CN_NUMERALS[i] ?? String(i + 1)}、` },
-      none: { indent: '', marker: () => '' },
+      paren: { indent: '   ', marker: (i) => `${i + 1}）` },
+      none: { indent: '   ', marker: () => '' },
     };
-    const NUMBERING_ORDER = ['dash', 'bullet', 'numbered', 'paren', 'cn', 'none'];
-    const CN_NUMERALS = ['一', '二', '三', '四', '五', '六', '七', '八', '九', '十',
-      '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十'];
+    const NUMBERING_ORDER = ['dash', 'bullet', 'numbered', 'paren', 'none'];
 
     /** One commit line in the chosen numbering, without the subject. */
     function formatCommitLine(commit, index, ctx) {
@@ -1105,8 +1101,10 @@ window.__ModuleLoader__.load({
           const shown = limit === 0 ? commits : commits.slice(0, limit);
 
           if (showRepoHeadings) {
+            // Repository headings carry no number: the numbers belong to the
+            // commits underneath, and a numbered heading competes with them.
             lines.push(plain
-              ? `${index + 1}. ${repo.title}${spec.branch && repo.branch ? `（${repo.branch}）` : ''}`
+              ? `${repo.title}${spec.branch && repo.branch ? `（${repo.branch}）` : ''}`
               : `### ${repo.title}${spec.branch && repo.branch ? ` (${repo.branch})` : ''}`);
           } else if (!plain && spec.repoHeading && active.length === 1) {
             // Markdown still needs a heading-looking anchor for the list.
