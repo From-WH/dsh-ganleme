@@ -438,7 +438,63 @@ test('the applied rewrite keeps the original reachable and shows a notice', asyn
   assert.equal(applied.text, '本期完成 3 次提交。');
 });
 
-test('the loading art carries the theme: bars, a sleeper and a fish', async () => {
+test('waiting text draws from a large, non-repeating pool', async () => {
+  const mod = await loadClient();
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8');
+  const zhBlock = src.slice(src.indexOf('const zh = {'), src.indexOf('const en = {'));
+  const lines = [...zhBlock.matchAll(/^\s+(?:loading|'(loading\.\d+)'):\s*'([^']*)'/gm)].map((m) => m[2]);
+  assert.ok(lines.length >= 20, `expect a sizable pool, got ${lines.length}`);
+  assert.equal(new Set(lines).size, lines.length, 'no duplicate lines');
+  for (const line of lines) assert.ok(line.trim().length > 3, `line too short: ${line}`);
+  // Nothing decorative left behind: the old SVG art is gone.
+  assert.ok(!src.includes('LoadingGlyph'), 'the animated glyph is removed');
+  assert.ok(!src.includes('gl-loadBar'), 'no bar animation styles remain');
+});
+
+test('the rotation deck shuffles and never repeats within a cycle', async () => {
+  await loadClient();
+
+  const timers = [];
+  const entries = [];
+  const realSetInterval = globalThis.setInterval;
+  const realClearInterval = globalThis.clearInterval;
+  globalThis.setInterval = (fn) => (timers.push(fn), timers.length);
+  globalThis.clearInterval = () => {};
+  try {
+    let current;
+    let refSlot = null;
+    const React = {
+      ...fakeReact(),
+      useState: (initial) => {
+        current = typeof initial === 'function' ? initial() : initial;
+        return [current, (next) => {
+          current = typeof next === 'function' ? next(current) : next;
+          entries.push(current);
+        }];
+      },
+      useRef: (v) => (refSlot ??= { current: v }),
+      useEffect: (fn) => fn(),
+    };
+    const mod = await loadClient({ react: React });
+    const pool = ['a', 'b', 'c', 'd', 'e'];
+    mod.__test.useRotatingText(pool, 2000, true);
+    // Drive the ticks explicitly: draw 1 happened on mount, so 4 ticks complete
+    // the first cycle over a five-line pool.
+    for (let i = 0; i < 4; i += 1) timers[0]();
+    const firstCycle = entries.slice(0, 5);
+    assert.equal(new Set(firstCycle).size, 5, `a full cycle shows each line once: ${firstCycle.join(',')}`);
+    assert.deepEqual([...firstCycle].sort(), [...pool].sort(), 'and covers the whole pool');
+    for (let i = 0; i < 5; i += 1) timers[0]();
+    const shownLines = entries.slice(5, 10);
+    assert.equal(new Set(shownLines).size, 5, `the next cycle is also complete: ${shownLines.join(',')}`);
+  } finally {
+    globalThis.setInterval = realSetInterval;
+    globalThis.clearInterval = realClearInterval;
+  }
+});
+
+test('the stats loader shows rotating text and no artwork', async () => {
   const captured = [];
   const React = {
     ...fakeReact(),
@@ -449,91 +505,22 @@ test('the loading art carries the theme: bars, a sleeper and a fish', async () =
     },
   };
   const mod = await loadClient({ react: React });
-  mod.__test.LoadingGlyph({ size: 64, label: '正在统计…' });
-  const byClass = (name) => captured.filter((c) => String(c.props.className ?? '') === name);
-  assert.equal(byClass('gl-loadBar').length, 3, 'three growing bars');
-  assert.equal(byClass('gl-loadSleeper').length, 1, 'the dozing figure');
-  assert.equal(byClass('gl-loadZzz').length, 1, 'sleep marks');
-  assert.equal(byClass('gl-loadFish').length, 1, 'the fish');
-  assert.equal(byClass('gl-loadBubble').length, 2, 'bubbles');
-  assert.ok(captured.some((c) => c.props.role === 'status'), 'announced as a status');
-  assert.ok(byClass('gl-loadLabel').length === 1, 'the copy sits beside the art');
-  // Gradient ids are scoped to the package so two loaders cannot collide.
-  const ids = captured.filter((c) => c.type === 'linearGradient').map((c) => c.props.id);
-  assert.equal(new Set(ids).size, 3);
-  for (const id of ids) assert.match(id, /glLoadBar\d-/);
-  const fills = captured.filter((c) => c.type === 'rect' && String(c.props.fill ?? '').startsWith('url(')).map((c) => c.props.fill);
-  for (const fill of fills) {
-    const ref = fill.slice(5, -1);
-    assert.ok(ids.includes(ref), `fill ${fill} refers to a defined gradient`);
-  }
+  const registered = [];
+  mod.apply({
+    effect() {},
+    locale: { register() {}, bind: () => (k) => k, getLocale: () => ({ active: 'zh' }) },
+    slots: { inject: (_n, cb) => cb(), register: (opts, comp) => registered.push({ opts, comp }) },
+  });
+  captured.length = 0;
+  const page = registered.find((r) => r.opts.name === 'main');
+  page.comp({ t: (k) => k, addRootPick: async () => ({}), addRoot: async () => ({}), removeRoot: async () => ({}), loadRoots: async () => [], localeId: () => 'zh' });
+  const status = captured.find((c) => c.props['aria-live'] === 'polite');
+  assert.ok(status, 'the waiting line is announced');
+  assert.ok(captured.some((c) => c.props.className === 'gl-loadText'), 'plain text, no SVG');
+  assert.ok(!captured.some((c) => c.type === 'svg' && String(c.props.className).includes('gl-load')), 'no loading artwork');
 });
 
-test('the art is fully filled, with no thin outline styling', async () => {
-  const fs = await import('node:fs');
-  const src = fs.readFileSync(new URL('../client.js', import.meta.url), 'utf8');
-  const css = src.slice(src.indexOf('const css = `'), src.indexOf('const pad2'));
-  // Every animated part must be present in the stylesheet, and motion must be optional.
-  for (const name of ['gl-loadBar', 'gl-loadSleeper', 'gl-loadZzz', 'gl-loadFish', 'gl-loadBubble']) {
-    assert.ok(css.includes('.' + name), `${name} is styled`);
-  }
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\)/, 'motion can be disabled');
-  const reduceBlock = css.slice(css.indexOf('prefers-reduced-motion'));
-  for (const name of ['gl-loadBar', 'gl-loadFish']) assert.ok(reduceBlock.includes(name), `${name} respects reduced motion`);
-});
-
-test('waiting copy rotates on a timer and stops when inactive', async () => {
-  // Observe the hook's own contract: it reads state, advances it on the timer,
-  // and only subscribes when a rotation can actually happen.
-  const timers = [];
-  const realSetInterval = globalThis.setInterval;
-  const realClearInterval = globalThis.clearInterval;
-  globalThis.setInterval = (fn) => (timers.push(fn), timers.length);
-  globalThis.clearInterval = () => {};
-  try {
-    let current = 0;
-    const applied = [];
-    const React = {
-      ...fakeReact(),
-      useState: (initial) => {
-        // A real setter always advances from the latest state, not the closed-over one.
-        current = typeof initial === 'function' ? initial() : initial;
-        return [current, (next) => {
-          current = typeof next === 'function' ? next(current) : next;
-          applied.push(current);
-        }];
-      },
-      useEffect: (fn) => {
-        fn();
-      },
-    };
-    const mod = await loadClient({ react: React });
-    const lines = ['正在统计…', '正在翻 git 账本…', '正在数你今天敲了多少行…'];
-    const shown = mod.__test.useRotatingText(lines, 2400, true);
-    assert.equal(shown, lines[0], 'starts at the first line');
-    assert.equal(timers.length, 1, 'subscribes once while active');
-
-    // Firing the tick advances to the next line; it wraps back to the start.
-    timers[0]();
-    assert.equal(applied.at(-1), 1, 'advances the index by one');
-    timers[0]();
-    assert.equal(applied.at(-1), 2);
-    timers[0]();
-    assert.equal(applied.at(-1), 0, 'wraps around after the last line');
-
-    // An inactive rotation or a single-line list subscribes to nothing.
-    timers.length = 0;
-    mod.__test.useRotatingText(['only one'], 2400, true);
-    assert.equal(timers.length, 0, 'a single line needs no timer');
-    mod.__test.useRotatingText(lines, 2400, false);
-    assert.equal(timers.length, 0, 'inactive rotation needs no timer');
-  } finally {
-    globalThis.setInterval = realSetInterval;
-    globalThis.clearInterval = realClearInterval;
-  }
-});
-
-test('folder import shows art plus a real progress bar', async () => {
+test('folder import shows a real progress bar', async () => {
   const captured = [];
   const React = {
     ...fakeReact(),
@@ -555,8 +542,8 @@ test('folder import shows art plus a real progress bar', async () => {
   assert.equal(bar.props['aria-valuemax'], 12);
   const fill = captured.find((c) => String(c.props.className ?? '') === 'gl-progressFill');
   assert.equal(fill.props.style.width, '25%', 'quarter done');
-  // A nested component is an element here, not expanded markup.
-  assert.ok(captured.some((c) => typeof c.type === 'function' && c.type.name === 'LoadingGlyph'), 'the themed art accompanies it');
+  assert.ok(captured.some((c) => c.props.className === 'gl-importingText'), 'progress copy beside the bar');
+  assert.ok(!captured.some((c) => typeof c.type === 'function' && c.type.name === 'LoadingGlyph'), 'no artwork');
 });
 
 test('repos without git identity are named in mine reports', () => {

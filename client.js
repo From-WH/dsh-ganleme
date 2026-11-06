@@ -43,9 +43,27 @@ window.__ModuleLoader__.load({
       'report.title.range': '工作报告',
       refresh: '刷新',
       loading: '正在统计…',
-      'loading.2': '正在翻 git 账本…',
-      'loading.3': '正在数你今天敲了多少行…',
-      'loading.4': '小人趁机摸会儿鱼…',
+      'loading.2': '正在翻 git 账本，一笔一笔对…',
+      'loading.3': '正在数你今天敲了多少行代码…',
+      'loading.4': '小人趁机摸会儿鱼，你稍等…',
+      'loading.5': '正在挨个仓库敲门，看谁今天在干活…',
+      'loading.6': '正在跟 git 讲道理，它有时候不听…',
+      'loading.7': '正在清点今天的成果，别急…',
+      'loading.8': '正在统计，顺便帮你想想日报怎么写…',
+      'loading.9': '正在数提交，数到一半忘了数到哪…',
+      'loading.10': '正在采访各个仓库，问问今天谁勤快…',
+      'loading.11': '正在把 diff 一行行摊开看…',
+      'loading.12': '正在计算你的努力，这个不太好量化…',
+      'loading.13': '正在催 git 快点回答…',
+      'loading.14': '正在整理今天的战绩，有点多…',
+      'loading.15': '正在扫描代码，顺便看看有没有摸鱼痕迹…',
+      'loading.16': '正在核对，有人的提交格外可疑…',
+      'loading.17': '正在数行数，数得眼睛都花了…',
+      'loading.18': '正在生成统计，马上就完，真的…',
+      'loading.19': '正在翻旧账，昨天的也一并算了…',
+      'loading.20': '正在努力，比写代码还努力…',
+      'loading.21': '正在读提交记录，你看不懂的那些…',
+      'loading.22': '正在把杂乱的提交整理成能交差的样子…',
       loadFailed: '统计失败',
       retry: '重试',
       'section.repos': '仓库明细',
@@ -252,9 +270,27 @@ window.__ModuleLoader__.load({
       'report.title.range': 'Work Report',
       refresh: 'Refresh',
       loading: 'Crunching numbers…',
-      'loading.2': 'Leafing through the git ledger…',
+      'loading.2': 'Leafing through the git ledger, entry by entry…',
       'loading.3': 'Counting the lines you typed today…',
-      'loading.4': 'Someone is sneaking in a nap…',
+      'loading.4': 'Someone is sneaking in a nap — hold on…',
+      'loading.5': 'Knocking on each repository to see who worked today…',
+      'loading.6': 'Reasoning with git. Git is not always reasonable…',
+      'loading.7': 'Tallying up today output. Patience…',
+      'loading.8': 'Counting commits, and drafting your report while at it…',
+      'loading.9': 'Counting commits. Lost count. Starting over…',
+      'loading.10': 'Interviewing every repository about its day…',
+      'loading.11': 'Unfolding the diff line by line…',
+      'loading.12': 'Measuring your effort. That is hard to quantify…',
+      'loading.13': 'Nudging git to answer faster…',
+      'loading.14': 'Collecting today battle record. It is substantial…',
+      'loading.15': 'Scanning the code, and any evidence of goofing off…',
+      'loading.16': 'Cross-checking. Some of these commits look suspicious…',
+      'loading.17': 'Counting lines until my eyes blur…',
+      'loading.18': 'Generating stats. Almost done. Really…',
+      'loading.19': 'Digging up yesterday numbers too…',
+      'loading.20': 'Working hard — harder than the code did…',
+      'loading.21': 'Reading commit messages, including the unreadable ones…',
+      'loading.22': 'Turning messy commits into something presentable…',
       loadFailed: 'Failed to load stats',
       retry: 'Retry',
       'section.repos': 'Repositories',
@@ -714,32 +750,9 @@ window.__ModuleLoader__.load({
 .gl-emptyTitle{margin:0;font-size:14px;font-weight:600}
 .gl-emptyHint{margin:6px 0 0;font-size:12px;color:var(--dsw-alias-label-secondary)}
 
-/* Waiting state: bars grow in turn, the sleeper rides the tallest, a fish passes. */
-.gl-importing{display:flex;align-items:center;gap:10px}
-.gl-importingText{display:flex;flex-direction:column;gap:4px;min-width:0;flex:1}
-.gl-progress{height:4px;border-radius:2px;background:var(--dsw-alias-bg-layer-2);overflow:hidden}
-.gl-progressFill{height:100%;border-radius:2px;background:var(--dsw-alias-brand-primary);transition:width .25s ease}
-.gl-load{display:inline-flex;align-items:center;gap:12px;color:var(--dsw-alias-label-secondary)}
-.gl-loadArt{flex:none;overflow:visible}
-.gl-loadLabel{font-size:13px;line-height:19px}
-.gl-loadBar{transform-box:fill-box;transform-origin:bottom;animation:gl-grow 1.6s ease-in-out infinite}
-.gl-loadBar[data-bar="1"]{animation-delay:0s}
-.gl-loadBar[data-bar="2"]{animation-delay:.18s}
-.gl-loadBar[data-bar="3"]{animation-delay:.36s}
-.gl-loadSleeper{animation:gl-bob 1.8s ease-in-out infinite}
-.gl-loadZzz{transform-box:fill-box;transform-origin:center;animation:gl-zzz 2.2s ease-in-out infinite}
-.gl-loadFish{animation:gl-swim 3.2s linear infinite}
-.gl-loadBubble{animation:gl-rise 2.4s ease-out infinite}
-.gl-loadBubble[data-b="2"]{animation-delay:.7s}
-@keyframes gl-grow{0%,100%{transform:scaleY(.55)}45%{transform:scaleY(1)}}
-@keyframes gl-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-1.6px)}}
-@keyframes gl-zzz{0%{opacity:.15;transform:translateY(1px) scale(.94)}45%{opacity:.95;transform:translateY(-2px) scale(1)}100%{opacity:0;transform:translateY(-5px) scale(1.04)}}
-@keyframes gl-swim{0%{transform:translateX(-6px)}55%{transform:translateX(10px)}100%{transform:translateX(-6px)}}
-@keyframes gl-rise{0%{opacity:0;transform:translateY(3px)}30%{opacity:.8}100%{opacity:0;transform:translateY(-6px)}}
-/* Respect a reduced-motion preference: keep the art, drop the movement. */
-@media (prefers-reduced-motion: reduce){
-  .gl-loadBar,.gl-loadSleeper,.gl-loadZzz,.gl-loadFish,.gl-loadBubble{animation:none}
 }
+.gl-loadText{font-size:13px;line-height:19px;color:var(--dsw-alias-label-secondary)}
+.gl-preLoading .gl-loadText{font-size:13px}
 .gl-status{display:flex;align-items:center;gap:8px;padding:28px 4px;color:var(--dsw-alias-label-secondary);font-size:13px}
 .gl-dot{width:8px;height:8px;border-radius:50%;background:var(--dsw-alias-brand-primary);animation:gl-pulse 1.2s ease-in-out infinite}
 .gl-dot[data-error="true"]{background:var(--dsw-alias-state-error-primary);animation:none}
@@ -1727,7 +1740,7 @@ window.__ModuleLoader__.load({
             ? h('div', { className: 'gl-pre' }, `${t('report.failed')}: ${report.error}`)
             : (showOriginal ? report.original : report.text)
               ? h('pre', { className: 'gl-pre' }, showOriginal ? report.original : report.text)
-              : h('div', { className: 'gl-pre gl-preLoading' }, h(LoadingGlyph, { size: 72, label: t('report.generating') })),
+              : h('div', { className: 'gl-pre gl-preLoading' }, h('span', { className: 'gl-loadText', role: 'status', 'aria-live': 'polite' }, t('report.generating'))),
           h(
             'div',
             { className: 'gl-modalFoot' },
@@ -1743,71 +1756,41 @@ window.__ModuleLoader__.load({
     }
 
     /**
-     * The plugin's waiting indicator: three bars growing in turn, a small figure
-     * dozing on the tallest one, and a fish swimming past. Pure SVG so it renders
-     * inside any slot; the animation lives in the stylesheet (`.gl-load`), so the
-     * component stays a static tree.
-     * @param props.size edge length in px; props.label drawn beside it.
+     * Rotating waiting copy. Lines are shuffled into a deck and drawn without
+     * repetition, so two waits in a row do not show the same joke and a long
+     * wait keeps moving through the whole pool before repeating.
+     * @param lines localized strings to draw from.
+     * @param intervalMs how long each line stays.
+     * @param active false while the caller is not waiting; the timer stops.
+     * @returns the current line.
      */
-    function LoadingGlyph({ size = 56, label }) {
-      // Gradient ids are document-global; a single hidden instance defines them
-      // once so two loaders on one page cannot fight over the same id.
-      const gradientId = (name) => `${name}-${PACKAGE.replace(/[^a-z0-9]/gi, '')}`;
-      return h(
-        'div',
-        { className: 'gl-load', role: 'status', 'aria-live': 'polite' },
-        h(
-          'svg',
-          { width: size, height: size, viewBox: '0 0 64 64', 'aria-hidden': true, className: 'gl-loadArt' },
-          h(
-            'defs',
-            null,
-            h('linearGradient', { id: gradientId('glLoadBar1'), x1: 0, y1: 0, x2: 0, y2: 1 },
-              h('stop', { offset: 0, stopColor: '#34d9f2' }), h('stop', { offset: 1, stopColor: '#0e9cc4' })),
-            h('linearGradient', { id: gradientId('glLoadBar2'), x1: 0, y1: 0, x2: 0, y2: 1 },
-              h('stop', { offset: 0, stopColor: '#5fa2f7' }), h('stop', { offset: 1, stopColor: '#2f5fe0' })),
-            h('linearGradient', { id: gradientId('glLoadBar3'), x1: 0, y1: 0, x2: 0, y2: 1 },
-              h('stop', { offset: 0, stopColor: '#b78efc' }), h('stop', { offset: 1, stopColor: '#7c46e8' })),
-          ),
-          // Bars: each grows and settles on its own delay.
-          h('rect', { className: 'gl-loadBar', 'data-bar': '1', x: 12, y: 30, width: 9, height: 22, rx: 3, fill: `url(#${gradientId('glLoadBar1')})` }),
-          h('rect', { className: 'gl-loadBar', 'data-bar': '2', x: 26, y: 22, width: 9, height: 30, rx: 3, fill: `url(#${gradientId('glLoadBar2')})` }),
-          h('rect', { className: 'gl-loadBar', 'data-bar': '3', x: 40, y: 12, width: 9, height: 40, rx: 3, fill: `url(#${gradientId('glLoadBar3')})` }),
-          // The dozing figure rides the tallest bar.
-          h('g', { className: 'gl-loadSleeper' },
-            h('rect', { x: 44, y: 12, width: 8, height: 4.4, rx: 2.2, fill: '#eef4ff' }),
-            h('circle', { cx: 44.6, cy: 9.4, r: 3.1, fill: '#ffffff' }),
-          ),
-          h('g', { className: 'gl-loadZzz' },
-            h('path', { d: 'M53 12h4.4l-4.4 4.4H57', stroke: '#bfe0ff', strokeWidth: 1.8, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none' }),
-            h('path', { d: 'M56.5 6.5h3l-3 3h3', stroke: '#bfe0ff', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round', fill: 'none', opacity: 0.7 }),
-          ),
-          // A fish swims across the bottom, bubbles trailing.
-          h('g', { className: 'gl-loadFish' },
-            h('ellipse', { cx: 20, cy: 55, rx: 5, ry: 3, fill: '#6fe6f7' }),
-            h('path', { d: 'M24.6 55L28 52.8v4.4Z', fill: '#6fe6f7' }),
-            h('circle', { cx: 18, cy: 54.2, r: 0.8, fill: '#0c1428' }),
-          ),
-          h('circle', { className: 'gl-loadBubble', 'data-b': '1', cx: 28, cy: 51, r: 1.3, fill: '#7de3f5' }),
-          h('circle', { className: 'gl-loadBubble', 'data-b': '2', cx: 31, cy: 48, r: 1, fill: '#7de3f5' }),
-        ),
-        label ? h('span', { className: 'gl-loadLabel' }, label) : null,
-      );
-    }
-
-    /**
-     * Rotating waiting copy, so a long wait does not repeat one flat sentence.
-     * @param lines localized strings shown in order.
-     * @returns the current line; changes on a timer owned by the caller.
-     */
-    function useRotatingText(lines, intervalMs = 2200, active = true) {
-      const [index, setIndex] = React.useState(0);
+    function useRotatingText(lines, intervalMs = 2000, active = true) {
+      const deckRef = React.useRef(null);
+      const [text, setText] = React.useState(() => lines[0]);
       React.useEffect(() => {
-        if (!active || lines.length < 2) return undefined;
-        const timer = setInterval(() => setIndex((i) => (i + 1) % lines.length), intervalMs);
+        if (!active || lines.length < 2) {
+          // Reshuffle on every new wait so the next wait starts elsewhere.
+          deckRef.current = null;
+          return undefined;
+        }
+        if (!deckRef.current || deckRef.current.length === 0) {
+          const deck = lines.slice();
+          for (let i = deck.length - 1; i > 0; i -= 1) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+          }
+          deckRef.current = deck;
+        }
+        setText(deckRef.current.pop());
+        const timer = setInterval(() => {
+          if (!deckRef.current || deckRef.current.length === 0) {
+            deckRef.current = lines.slice();
+          }
+          setText(deckRef.current.pop());
+        }, intervalMs);
         return () => clearInterval(timer);
       }, [active, lines.length, intervalMs]);
-      return lines[index % lines.length];
+      return text;
     }
 
     /** Gear glyph: opens the report format settings. */
@@ -2122,7 +2105,7 @@ window.__ModuleLoader__.load({
                 : output
                   ? h('pre', { className: 'gl-setPreviewBody' }, output)
                   : streaming
-                    ? h('div', { className: 'gl-setPreviewBody gl-preLoading' }, h(LoadingGlyph, { size: 56, label: t('polish.waiting') }))
+                    ? h('div', { className: 'gl-setPreviewBody gl-preLoading' }, h('span', { className: 'gl-loadText', role: 'status', 'aria-live': 'polite' }, t('polish.waiting')))
                     : h('pre', { className: 'gl-setPreviewBody' }, t('polish.idle')),
             ),
           ),
@@ -2216,7 +2199,6 @@ window.__ModuleLoader__.load({
               ? h(
                   'div',
                   { className: 'gl-skinStatus gl-importing' },
-                  h(LoadingGlyph, { size: 34 }),
                   h(
                     'div',
                     { className: 'gl-importingText' },
@@ -2422,11 +2404,12 @@ window.__ModuleLoader__.load({
       const [payload, setPayload] = React.useState(null);
       const [phase, setPhase] = React.useState('loading');
       /** Rotating copy under the loading art; the jokes match the theme. */
-      const loadingText = useRotatingText(
-        [t('loading'), t('loading.2'), t('loading.3'), t('loading.4')],
-        2400,
-        phase === 'loading',
+      // Resolve the whole pool each render; the hook draws without repeats.
+      const loadingPool = React.useMemo(
+        () => Array.from({ length: 22 }, (_, i) => t(i === 0 ? 'loading' : `loading.${i + 1}`)),
+        [t],
       );
+      const loadingText = useRotatingText(loadingPool, 2000, phase === 'loading');
       const [todayStats, setTodayStats] = React.useState(null);
       const [quip, setQuip] = React.useState(null);
       const quipDeckRef = React.useRef({});
@@ -3248,7 +3231,7 @@ window.__ModuleLoader__.load({
               )
             : null,
           phase === 'loading'
-            ? h('div', { className: 'gl-status' }, h(LoadingGlyph, { size: 64, label: loadingText }))
+            ? h('div', { className: 'gl-status', role: 'status', 'aria-live': 'polite' }, h('span', { className: 'gl-loadText' }, loadingText))
             : null,
           phase === 'error'
             ? h(
@@ -3426,7 +3409,6 @@ window.__ModuleLoader__.load({
         COMMIT_TYPES,
         POLISH_LEVELS,
         POLISH_TONES,
-        LoadingGlyph,
         useRotatingText,
         SkinModal,
         PolishSheet,
