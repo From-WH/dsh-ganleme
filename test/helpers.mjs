@@ -22,6 +22,10 @@ writeFileSync(
 );
 process.env.HOME = HOME;
 process.env.GIT_CONFIG_NOSYSTEM = '1';
+// The plugin keeps update status in os.tmpdir(); never touch the real one,
+// or a running plugin on this machine would report a test failure.
+mkdirSync(join(SANDBOX, 'tmp'), { recursive: true });
+process.env.TMPDIR = join(SANDBOX, 'tmp');
 process.on('exit', () => rmSync(SANDBOX, { recursive: true, force: true }));
 
 /** Local calendar date `offset` days from today, as YYYY-MM-DD. */

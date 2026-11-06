@@ -119,6 +119,7 @@ window.__ModuleLoader__.load({
       'update.done': '已更新到 v{version}，即将刷新…',
       'update.failed': '更新失败：{message}',
       'update.timeout': '更新超时，请稍后手动刷新页面',
+      'update.local': '当前是本地开发安装，不会自动更新',
       'update.available': '新版本 v{version} 可用，点击更新',
       'projects.label': '项目源',
       'projects.title': '项目源',
@@ -232,6 +233,7 @@ window.__ModuleLoader__.load({
       'update.done': 'Updated to v{version}; refreshing…',
       'update.failed': 'Update failed: {message}',
       'update.timeout': 'Update timed out; refresh the page manually later',
+      'update.local': 'This is a local development install; it is not updated automatically',
       'update.available': 'New version v{version} available — click to update',
       'projects.label': 'Projects',
       'projects.title': 'Project sources',
@@ -1727,14 +1729,23 @@ window.__ModuleLoader__.load({
           return;
         }
         if (!target.updateAvailable) {
-          flashUpdate({ phase: 'latest', message: t('update.latest') });
+          flashUpdate({ phase: 'latest', message: t(target.localInstall ? 'update.local' : 'update.latest') });
           return;
         }
         setUpdateState({ phase: 'updating', message: fmt(t('update.updating'), { version: target.latest }) });
-        fetch('ganleme/update/install', { method: 'POST' }).catch(() => {});
         const startedAt = Date.now();
+        try {
+          const res = await fetch('ganleme/update/install', { method: 'POST' });
+          if (res.status !== 202) {
+            const body = await res.json().catch(() => null);
+            flashUpdate({ phase: 'error', message: fmt(t('update.failed'), { message: body?.message || `HTTP ${res.status}` }) });
+            return;
+          }
+        } catch {
+          // The request may be cut off while the plugin restarts; keep polling.
+        }
         const poll = async () => {
-          while (Date.now() - startedAt < 120_000) {
+          while (Date.now() - startedAt < 180_000) {
             await new Promise((resolve) => setTimeout(resolve, 2_000));
             try {
               const meta = await fetchJson('ganleme/meta');
@@ -1743,7 +1754,15 @@ window.__ModuleLoader__.load({
                 setTimeout(() => window.location.reload(), 1_200);
                 return;
               }
-            } catch {}
+              // The plugin came back on its old version with the reason recorded.
+              const last = meta.lastUpdate;
+              if (last && last.to === target.latest && last.at >= startedAt) {
+                flashUpdate({ phase: 'error', message: fmt(t('update.failed'), { message: last.error }) });
+                return;
+              }
+            } catch {
+              // 404 while the bundle is being reinstalled.
+            }
           }
           setUpdateState({ phase: 'error', message: t('update.timeout') });
         };

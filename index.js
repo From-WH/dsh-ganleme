@@ -17,8 +17,8 @@
  */
 import { execFile } from 'node:child_process';
 import { readdir, realpath, stat } from 'node:fs/promises';
-import { readFileSync } from 'node:fs';
-import { homedir } from 'node:os';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { homedir, tmpdir } from 'node:os';
 import { basename, dirname, isAbsolute, join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import z from './vendor/schemastery.mjs';
@@ -687,17 +687,79 @@ export function apply(ctx, config) {
   };
 
   /**
-   * Reinstall `pkg@latest`. `manager` is captured by the caller before the
-   * removal disposes this plugin, which also clears `optional.pluginManager`.
+   * Status of the last self-update, kept outside the package directory (the
+   * update replaces it) so the reinstalled plugin can report a failure.
    */
-  const performUpdate = async (manager, pkg, latest) => {
+  const statusPath = (pkg) => join(tmpdir(), `dsh-ganleme-update-${String(pkg).replace(/[^a-z0-9._-]/gi, '_')}.json`);
+  const writeUpdateStatus = (pkg, status) => {
     try {
-      console.info(`[ganleme] updating ${pkg} -> ${latest}: removing the installed bundle first`);
-      await manager.removeBundle(pkg);
-      const result = await manager.installBundle(`${pkg}@${latest}`);
-      console.info(`[ganleme] update applied, application=${result?.application ?? 'unknown'}`);
+      writeFileSync(statusPath(pkg), JSON.stringify({ ...status, at: Date.now() }));
+    } catch {}
+  };
+  const readUpdateStatus = (pkg) => {
+    try {
+      const status = JSON.parse(readFileSync(statusPath(pkg), 'utf8'));
+      return Date.now() - status.at < 60 * 60 * 1000 ? status : null;
+    } catch {
+      return null;
+    }
+  };
+
+  /** Where this bundle is installed from, per the plugin manager (null if unknown). */
+  const installSource = async (manager, pkg) => {
+    try {
+      const bundles = await manager.listBundles();
+      return (Array.isArray(bundles) ? bundles : []).find((b) => b?.name === pkg)?.source ?? null;
+    } catch {
+      return null;
+    }
+  };
+  /** A linked or folder install is a developer checkout: never replace it. */
+  const isLocalSource = (source) => typeof source === 'string' && /^(link|file):/.test(source);
+
+  const succeeded = (result) => result?.application === 'applied' || result?.application === 'restart-required';
+  const describe = (result, error) =>
+    String(error?.message ?? error ?? result?.error?.diagnostic ?? result?.error?.code ?? result?.application ?? 'unknown failure').slice(0, 500);
+
+  /**
+   * Replace `from` with `to`. `manager` is captured by the caller: the removal
+   * disposes this plugin. When the new version cannot be installed the old
+   * one is reinstalled, and the reason is written for the restarted plugin.
+   */
+  const performUpdate = async (manager, pkg, from, to) => {
+    writeUpdateStatus(pkg, { phase: 'running', from, to });
+    try {
+      const removed = await manager.removeBundle(pkg);
+      if (!succeeded(removed)) {
+        // Still installed and running: report straight away.
+        writeUpdateStatus(pkg, { phase: 'failed', from, to, error: `remove: ${describe(removed)}` });
+        return;
+      }
+      let installed;
+      let installError;
+      try {
+        installed = await manager.installBundle(`${pkg}@${to}`);
+      } catch (error) {
+        installError = error;
+      }
+      if (succeeded(installed)) {
+        writeUpdateStatus(pkg, { phase: 'done', from, to });
+        console.info(`[ganleme] updated ${pkg} ${from} -> ${to}`);
+        return;
+      }
+      const reason = describe(installed, installError);
+      console.error(`[ganleme] update to ${to} failed (${reason}); reinstalling ${from}`);
+      writeUpdateStatus(pkg, { phase: 'failed', from, to, error: reason });
+      try {
+        const restored = await manager.installBundle(`${pkg}@${from}`);
+        if (!succeeded(restored)) {
+          writeUpdateStatus(pkg, { phase: 'failed', from, to, error: `${reason}; rollback: ${describe(restored)}` });
+        }
+      } catch (error) {
+        writeUpdateStatus(pkg, { phase: 'failed', from, to, error: `${reason}; rollback: ${describe(null, error)}` });
+      }
     } catch (error) {
-      console.error('[ganleme] update failed:', String(error?.message ?? error));
+      writeUpdateStatus(pkg, { phase: 'failed', from, to, error: describe(null, error) });
     } finally {
       updating = false;
     }
@@ -712,7 +774,13 @@ export function apply(ctx, config) {
           if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           const update = updateConfigOf();
-          sendJson(res, 200, { version: currentVersion(), update: update ? { pkg: update.pkg } : null });
+          const last = update ? readUpdateStatus(update.pkg) : null;
+          sendJson(res, 200, {
+            version: currentVersion(),
+            update: update ? { pkg: update.pkg } : null,
+            // Failures stay visible after the plugin restarts on its old version.
+            lastUpdate: last && last.phase === 'failed' ? { from: last.from, to: last.to, error: last.error, at: last.at } : null,
+          });
         },
       }),
     'ganleme: GET /ganleme/meta',
@@ -738,11 +806,14 @@ export function apply(ctx, config) {
           try {
             const latest = await fetchLatestVersion(update.pkg, update.registry);
             const current = currentVersion();
+            const localInstall = isLocalSource(await installSource(update.manager, update.pkg));
             sendJson(res, 200, {
               pkg: update.pkg,
               current,
               latest,
-              updateAvailable: latest !== null && compareVersions(latest, current) > 0,
+              localInstall,
+              // A developer checkout is never replaced, so never offered.
+              updateAvailable: !localInstall && latest !== null && compareVersions(latest, current) > 0,
             });
           } catch (error) {
             sendJson(res, 502, { code: 'registry-unreachable', message: String(error?.message ?? error) });
@@ -776,9 +847,14 @@ export function apply(ctx, config) {
               sendJson(res, 200, { started: false, reason: 'up-to-date', current, latest });
               return;
             }
+            const source = await installSource(update.manager, update.pkg);
+            if (isLocalSource(source)) {
+              sendJson(res, 409, { code: 'local-install', message: `installed from ${source}; update the checkout instead` });
+              return;
+            }
             updating = true;
             sendJson(res, 202, { started: true, pkg: update.pkg, from: current, to: latest });
-            void performUpdate(update.manager, update.pkg, latest);
+            void performUpdate(update.manager, update.pkg, current, latest);
           } catch (error) {
             sendJson(res, 502, { code: 'registry-unreachable', message: String(error?.message ?? error) });
           }

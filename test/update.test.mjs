@@ -18,7 +18,7 @@ function stubRegistry(latest) {
   return { seen, restore: () => (globalThis.fetch = real) };
 }
 
-function fakeManager(source = 'dsh-ganleme@^0.2.0') {
+function fakeManager(source = 'dsh-ganleme@^0.2.0', { installFails = null, removeFails = false } = {}) {
   const calls = [];
   return {
     calls,
@@ -27,10 +27,13 @@ function fakeManager(source = 'dsh-ganleme@^0.2.0') {
     },
     async removeBundle(name) {
       calls.push(['remove', name]);
-      return { application: 'applied' };
+      return removeFails ? { application: 'failed', error: { code: 'bundle-in-use' } } : { application: 'applied' };
     },
     async installBundle(spec) {
       calls.push(['install', spec]);
+      if (installFails && spec.endsWith(`@${installFails}`)) {
+        return { application: 'failed', error: { code: 'operation-error', diagnostic: 'minimumReleaseAge' } };
+      }
       return { application: 'applied' };
     },
   };
@@ -86,7 +89,63 @@ test('install: newer version is removed then installed', async () => {
     const { status } = await call('/ganleme/update/install', { method: 'POST' });
     assert.equal(status, 202);
     await settle();
-    assert.deepEqual(manager.calls.at(-1), ['install', `dsh-ganleme@${bump(VERSION)}`]);
+    assert.deepEqual(manager.calls, [['remove', 'dsh-ganleme'], ['install', `dsh-ganleme@${bump(VERSION)}`]]);
+    assert.equal((await call('/ganleme/meta')).json.lastUpdate, null, 'success records no failure');
+  } finally {
+    reg.restore();
+  }
+});
+
+test('local link installs are never offered or replaced', async () => {
+  const reg = stubRegistry(bump(VERSION));
+  try {
+    const manager = fakeManager('link:/Users/dev/dsh-ganleme');
+    const { call } = await makeHost({ services: { pluginManager: manager } });
+    const check = (await call('/ganleme/update')).json;
+    assert.equal(check.localInstall, true);
+    assert.equal(check.updateAvailable, false);
+    const install = await call('/ganleme/update/install', { method: 'POST' });
+    assert.equal(install.status, 409);
+    assert.equal(install.json.code, 'local-install');
+    await settle();
+    assert.deepEqual(manager.calls, []);
+  } finally {
+    reg.restore();
+  }
+});
+
+test('failed install reinstalls the old version and records why', async () => {
+  const target = bump(VERSION);
+  const reg = stubRegistry(target);
+  try {
+    const manager = fakeManager(undefined, { installFails: target });
+    const { call } = await makeHost({ services: { pluginManager: manager } });
+    assert.equal((await call('/ganleme/update/install', { method: 'POST' })).status, 202);
+    await settle();
+    assert.deepEqual(manager.calls, [
+      ['remove', 'dsh-ganleme'],
+      ['install', `dsh-ganleme@${target}`],
+      ['install', `dsh-ganleme@${VERSION}`],
+    ]);
+    // The reinstalled plugin (a fresh host) reports the recorded failure.
+    const fresh = await makeHost({ services: { pluginManager: fakeManager() } });
+    const last = (await fresh.call('/ganleme/meta')).json.lastUpdate;
+    assert.equal(last.to, target);
+    assert.match(last.error, /minimumReleaseAge/);
+  } finally {
+    reg.restore();
+  }
+});
+
+test('failed removal stops before installing', async () => {
+  const reg = stubRegistry(bump(VERSION));
+  try {
+    const manager = fakeManager(undefined, { removeFails: true });
+    const { call } = await makeHost({ services: { pluginManager: manager } });
+    await call('/ganleme/update/install', { method: 'POST' });
+    await settle();
+    assert.deepEqual(manager.calls, [['remove', 'dsh-ganleme']]);
+    assert.match((await call('/ganleme/meta')).json.lastUpdate.error, /bundle-in-use/);
   } finally {
     reg.restore();
   }
