@@ -116,6 +116,37 @@ window.__ModuleLoader__.load({
       'report.toggle.author.hint': '在每条提交后显示提交人（长报告容易忘记是谁写的）',
       'report.numbering': '序号',
       'report.settings': '格式设置',
+      'polish.title': 'AI 润色',
+      'polish.level': '改写力度',
+      'polish.levelHint': '决定改写到什么程度，事实和数字始终不变',
+      'polish.level.items': '润色条目',
+      'polish.level.items.hint': '保留分仓库结构和每条清单，只把措辞改通顺',
+      'polish.level.paragraph': '合并成段',
+      'polish.level.paragraph.hint': '把同一仓库的条目合成一段连贯的话',
+      'polish.level.summary': '精简成句',
+      'polish.level.summary.hint': '每个仓库压成一句话概括',
+      'polish.tone': '语气',
+      'polish.tone.plain': '简洁专业',
+      'polish.tone.report': '汇报口吻',
+      'polish.tone.natural': '朴实自然',
+      'polish.note': '补充说明',
+      'polish.noteHint': '可选，例如：面向技术负责人，突出架构改动',
+      'polish.prompt': '提示词',
+      'polish.promptHint': '可以查看和临时修改；留空则用内置提示词。修改只影响这一次。',
+      'polish.promptReset': '恢复内置提示词',
+      'polish.result': '润色结果',
+      'polish.waiting': '正在生成…',
+      'polish.idle': '点「开始润色」生成结果',
+      'polish.start': '开始润色',
+      'polish.stop': '停止',
+      'polish.apply': '应用到报告',
+      'polish.cancel': '关闭',
+      'polish.streaming': '生成中',
+      'polish.failed': '润色失败：{message}',
+      'polish.numbersChanged': '润色结果出现了原文没有的数字（{extra}），已拒绝应用。可以手动改掉后重试。',
+      'report.view.polished': '润色后',
+      'report.view.original': '原文',
+
       'report.settings.save': '保存格式',
       'report.styleHint': '决定报告的整体骨架和取舍',
       'report.numberingHint': '每条提交前面的标记，仅纯文本格式下生效',
@@ -288,6 +319,37 @@ window.__ModuleLoader__.load({
       'report.toggle.author.hint': 'Name the author after each commit',
       'report.numbering': 'Markers',
       'report.settings': 'Format settings',
+      'polish.title': 'AI polish',
+      'polish.level': 'Rewrite level',
+      'polish.levelHint': 'How far to rewrite; facts and numbers never change',
+      'polish.level.items': 'Polish bullets',
+      'polish.level.items.hint': 'Keep the per-repository structure and each bullet; only reword',
+      'polish.level.paragraph': 'Merge to paragraphs',
+      "polish.level.paragraph.hint": "Join one repository's bullets into a connected paragraph",
+      'polish.level.summary': 'One sentence each',
+      'polish.level.summary.hint': 'Condense each repository to a single sentence',
+      'polish.tone': 'Tone',
+      'polish.tone.plain': 'Plain',
+      'polish.tone.report': 'Status report',
+      'polish.tone.natural': 'Natural',
+      'polish.note': 'Extra guidance',
+      'polish.noteHint': 'Optional, e.g. for a technical lead; highlight architecture changes',
+      'polish.prompt': 'Prompt',
+      'polish.promptHint': 'View and temporarily edit it; leave empty for the built-in prompt. Edits apply to this run only.',
+      'polish.promptReset': 'Restore the built-in prompt',
+      'polish.result': 'Result',
+      'polish.waiting': 'Generating…',
+      'polish.idle': 'Press "Start" to generate',
+      'polish.start': 'Start',
+      'polish.stop': 'Stop',
+      'polish.apply': 'Apply to report',
+      'polish.cancel': 'Close',
+      'polish.streaming': 'Generating',
+      'polish.failed': 'Polish failed: {message}',
+      'polish.numbersChanged': 'The rewrite introduced numbers the original does not have ({extra}); it was not applied. Edit them out and try again.',
+      'report.view.polished': 'Polished',
+      'report.view.original': 'Original',
+
       'report.settings.save': 'Save format',
       'report.styleHint': 'Sets the overall shape of the report',
       'report.numberingHint': 'Marker before each commit; plain text only',
@@ -645,6 +707,13 @@ window.__ModuleLoader__.load({
 .gl-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.42);display:flex;align-items:center;justify-content:center;padding:32px;z-index:60}
 .gl-modal{width:min(760px,100%);max-height:min(640px,100%);display:flex;flex-direction:column;background:var(--dsw-alias-bg-overlay);border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-lg,12px);box-shadow:0 16px 48px rgba(0,0,0,.25);overflow:hidden}
 .gl-modalWide{width:min(920px,100%);max-height:min(760px,100%)}
+.gl-textarea{width:100%;box-sizing:border-box;font:inherit;font-size:12.5px;line-height:1.55;padding:8px 10px;border:1px solid var(--dsw-alias-border-l2);border-radius:var(--dsw-radius-sm);background:var(--dsw-alias-bg-layer-1);color:var(--dsw-alias-label-primary);resize:vertical}
+.gl-textarea:focus{outline:none;border-color:var(--dsw-alias-brand-primary)}
+.gl-textareaMono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:11.5px}
+.gl-textareaFill{flex:1;min-height:200px;resize:none;border:0;border-radius:0;background:transparent}
+.gl-details{font-size:12px;color:var(--dsw-alias-label-secondary)}
+.gl-details summary{cursor:pointer;font-weight:600;color:var(--dsw-alias-label-primary);padding:2px 0}
+.gl-details .gl-textarea{margin:6px 0}
 .gl-btnPrimary{border-color:var(--dsw-alias-brand-primary);background:var(--dsw-alias-brand-primary);color:#fff}
 .gl-btnPrimary:hover{filter:brightness(1.06);background:var(--dsw-alias-brand-primary)}
 .gl-setBody{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,0.85fr);gap:18px;padding:16px 18px;overflow-y:auto;min-height:0}
@@ -831,6 +900,18 @@ window.__ModuleLoader__.load({
     // ------------------------------------------------------------------
 
     const SKIN_STORAGE_KEY = 'dsh.ganleme.skin';
+    /** AI polish levels and tones, mirrored by the Host's instruction tables. */
+    const POLISH_LEVELS = ['items', 'paragraph', 'summary'];
+    const POLISH_TONES = ['plain', 'report', 'natural'];
+
+    /**
+     * Read the report text ready to polish, or null when the report is not
+     * showing anything (still generating, failed, or empty).
+     */
+    function polishSource(report) {
+      return report && typeof report.text === 'string' && report.text.trim() ? report.text : null;
+    }
+
     /** One stored record holds the whole confirmed report format. */
     const REPORT_CONFIG_KEY = 'dsh.ganleme.reportConfig';
 
@@ -1522,7 +1603,7 @@ window.__ModuleLoader__.load({
       return ref;
     }
 
-    function ReportModal({ report, onClose, onCopy, copied, onSettings, t }) {
+    function ReportModal({ report, onClose, onCopy, copied, onSettings, onPolish, canPolish, showOriginal, onToggleOriginal, t }) {
       const dialogRef = useDialogFocus();
       return h(
         'div',
@@ -1541,12 +1622,35 @@ window.__ModuleLoader__.load({
             h('h2', { className: 'gl-modalTitle' }, t('report.title.' + report.kind)),
             report.data ? h('span', { className: 'gl-modalRange' }, windowLabel(report.data)) : null,
             h('span', { style: { marginLeft: 'auto' } }),
+            // Only offered once a rewrite exists: the original is never lost.
+            report.polished
+              ? h(
+                  'div',
+                  { className: 'gl-tabs' },
+                  ['polished', 'original'].map((id) =>
+                    h(
+                      'button',
+                      {
+                        key: id,
+                        className: 'gl-tab',
+                        'aria-pressed': (id === 'original') === showOriginal,
+                        'data-active': (id === 'original') === showOriginal,
+                        onClick: () => onToggleOriginal(id === 'original'),
+                      },
+                      t('report.view.' + id),
+                    ),
+                  ),
+                )
+              : null,
+            canPolish
+              ? h('button', { className: 'gl-btn', disabled: !polishSource(report), onClick: onPolish }, t('polish.title'))
+              : null,
             h('button', { className: 'gl-iconBtn', 'aria-label': t('report.settings'), title: t('report.settings'), onClick: onSettings }, h(GearIcon)),
             h('button', { className: 'gl-btn', onClick: onClose }, t('report.close')),
           ),
           report.error
             ? h('div', { className: 'gl-pre' }, `${t('report.failed')}: ${report.error}`)
-            : h('pre', { className: 'gl-pre' }, report.text ?? t('report.generating')),
+            : h('pre', { className: 'gl-pre' }, (showOriginal ? report.original : report.text) ?? t('report.generating')),
           h(
             'div',
             { className: 'gl-modalFoot' },
@@ -1740,6 +1844,151 @@ window.__ModuleLoader__.load({
               'button',
               { className: 'gl-btn gl-btnPrimary', onClick: onSave },
               t(firstRun ? 'report.firstRun.save' : 'report.settings.save'),
+            ),
+          ),
+        ),
+      );
+    }
+
+
+    /**
+     * AI polish sheet: pick a rewrite level and tone, watch the model stream,
+     * then edit the result before applying it. The original stays untouched
+     * until "apply", and the number guard runs again on the edited text.
+     */
+    function PolishSheet({
+      draft, onDraft, phase, output, onOutput, error, onStart, onStop, onApply, onCancel, t,
+    }) {
+      const dialogRef = useDialogFocus();
+      const streaming = phase === 'streaming';
+      const canApply = phase === 'ready' || phase === 'stopped';
+      const levelCard = (id) =>
+        h(
+          'button',
+          {
+            key: id,
+            className: 'gl-styleCard',
+            'aria-pressed': draft.level === id,
+            'data-active': draft.level === id,
+            disabled: streaming,
+            onClick: () => onDraft({ ...draft, level: id }),
+          },
+          h('span', { className: 'gl-styleName' }, t('polish.level.' + id)),
+          h('span', { className: 'gl-styleHint' }, t('polish.level.' + id + '.hint')),
+        );
+      return h(
+        'div',
+        {
+          className: 'gl-backdrop',
+          onMouseDown: (e) => {
+            if (e.target === e.currentTarget) onCancel();
+          },
+        },
+        h(
+          'div',
+          { ref: dialogRef, tabIndex: -1, className: 'gl-modal gl-modalWide', role: 'dialog', 'aria-modal': true, 'aria-label': t('polish.title') },
+          h(
+            'div',
+            { className: 'gl-modalHead' },
+            h('h2', { className: 'gl-modalTitle' }, t('polish.title')),
+            streaming ? h('span', { className: 'gl-chip' }, t('polish.streaming')) : null,
+            h('span', { style: { marginLeft: 'auto' } }),
+            h('button', { className: 'gl-btn', onClick: onCancel }, t('polish.cancel')),
+          ),
+          h(
+            'div',
+            { className: 'gl-setBody' },
+            h(
+              'div',
+              { className: 'gl-setForm' },
+              h(
+                'section',
+                { className: 'gl-setSection' },
+                h('div', { className: 'gl-setHead' },
+                  h('h3', { className: 'gl-setTitle' }, t('polish.level')),
+                  h('p', { className: 'gl-setHint' }, t('polish.levelHint'))),
+                h('div', { className: 'gl-choiceGrid' }, POLISH_LEVELS.map(levelCard)),
+              ),
+              h(
+                'section',
+                { className: 'gl-setSection' },
+                h('div', { className: 'gl-setHead' }, h('h3', { className: 'gl-setTitle' }, t('polish.tone'))),
+                h(
+                  'div',
+                  { className: 'gl-choiceGrid gl-choiceGridTight' },
+                  POLISH_TONES.map((id) =>
+                    h(
+                      'button',
+                      {
+                        key: id,
+                        className: 'gl-choice',
+                        'aria-pressed': draft.tone === id,
+                        'data-active': draft.tone === id,
+                        disabled: streaming,
+                        onClick: () => onDraft({ ...draft, tone: id }),
+                      },
+                      t('polish.tone.' + id),
+                    ),
+                  ),
+                ),
+              ),
+              h(
+                'section',
+                { className: 'gl-setSection' },
+                h('div', { className: 'gl-setHead' }, h('h3', { className: 'gl-setTitle' }, t('polish.note'))),
+                h('textarea', {
+                  className: 'gl-textarea',
+                  rows: 2,
+                  placeholder: t('polish.noteHint'),
+                  value: draft.note,
+                  disabled: streaming,
+                  onChange: (e) => onDraft({ ...draft, note: e.target.value }),
+                }),
+              ),
+              h(
+                'details',
+                { className: 'gl-details' },
+                h('summary', null, t('polish.prompt')),
+                h('p', { className: 'gl-setHint' }, t('polish.promptHint')),
+                h('textarea', {
+                  className: 'gl-textarea gl-textareaMono',
+                  rows: 8,
+                  value: draft.system,
+                  onChange: (e) => onDraft({ ...draft, system: e.target.value }),
+                }),
+                h(
+                  'button',
+                  { className: 'gl-btn', onClick: () => onDraft({ ...draft, system: '' }) },
+                  t('polish.promptReset'),
+                ),
+              ),
+            ),
+            h(
+              'aside',
+              { className: 'gl-setPreview' },
+              h('div', { className: 'gl-setPreviewHead' }, t('polish.result')),
+              canApply
+                ? h('textarea', {
+                    className: 'gl-textarea gl-textareaFill',
+                    value: output,
+                    onChange: (e) => onOutput(e.target.value),
+                    'aria-label': t('polish.result'),
+                  })
+                : h('pre', { className: 'gl-setPreviewBody' }, output || t(streaming ? 'polish.waiting' : 'polish.idle')),
+            ),
+          ),
+          h(
+            'div',
+            { className: 'gl-modalFoot' },
+            error ? h('span', { className: 'gl-dateError', role: 'alert', style: { marginRight: 'auto' } }, error) : null,
+            streaming
+              ? h('button', { className: 'gl-btn', onClick: onStop }, t('polish.stop'))
+              : h('button', { className: 'gl-btn', onClick: onStart }, t('polish.start')),
+            h('button', { className: 'gl-btn', onClick: onCancel }, t('polish.cancel')),
+            h(
+              'button',
+              { className: 'gl-btn gl-btnPrimary', disabled: !canApply || !String(output ?? '').trim(), onClick: onApply },
+              t('polish.apply'),
             ),
           ),
         ),
@@ -1977,6 +2226,13 @@ window.__ModuleLoader__.load({
       const [draftConfig, setDraftConfig] = React.useState(null);
       /** Pending report request waiting for the format to be confirmed. */
       const pendingReportRef = React.useRef(null);
+      /** AI polish sheet: null when closed. */
+      const [polish, setPolish] = React.useState(null);
+      const polishAbortRef = React.useRef(null);
+      /** Show the untouched original while a rewrite is in place. */
+      const [showOriginal, setShowOriginal] = React.useState(false);
+      /** Whether the Host can polish at all (no llm service ⇒ no button). */
+      const [canPolish, setCanPolish] = React.useState(false);
       const [skin, setSkin] = React.useState(() => readStored(SKIN_STORAGE_KEY) ?? 'default');
       const [skinOpen, setSkinOpen] = React.useState(false);
       const [dailyRandom, setDailyRandom] = React.useState(() => readStored(BG_DAILY_KEY) === '1');
@@ -2007,6 +2263,18 @@ window.__ModuleLoader__.load({
       const skinMsgTimer = React.useRef(null);
       const updateTimer = React.useRef(null);
       const poolRef = React.useRef([]);
+
+      React.useEffect(() => {
+        let alive = true;
+        fetchJson('ganleme/meta')
+          .then((meta) => {
+            if (alive) setCanPolish(!!meta.polish);
+          })
+          .catch(() => {});
+        return () => {
+          alive = false;
+        };
+      }, []);
 
       React.useEffect(() => {
         let alive = true;
@@ -2486,6 +2754,115 @@ window.__ModuleLoader__.load({
         limit: draftConfig.limit,
       }) : '';
 
+      /** Open the polish sheet for the report currently on screen. */
+      const openPolish = () => {
+        const source = polishSource(report);
+        if (!source) return;
+        setPolish({
+          source,
+          draft: { level: 'items', tone: 'plain', note: '', system: '' },
+          phase: 'idle',
+          output: '',
+          error: '',
+        });
+      };
+
+      const closePolish = () => {
+        polishAbortRef.current?.abort();
+        polishAbortRef.current = null;
+        setPolish(null);
+      };
+
+      const stopPolish = () => {
+        polishAbortRef.current?.abort();
+        polishAbortRef.current = null;
+        setPolish((prev) => (prev ? { ...prev, phase: 'stopped' } : prev));
+      };
+
+      /**
+       * Run one polish request: POST the report, read the event stream, and
+       * fold deltas into the sheet. Aborting stops the read loop.
+       */
+      const startPolish = async () => {
+        const current = polish;
+        if (!current || current.phase === 'streaming') return;
+        const controller = new AbortController();
+        polishAbortRef.current = controller;
+        setPolish({ ...current, phase: 'streaming', output: '', error: '' });
+        const append = (chunk) => setPolish((prev) => (prev ? { ...prev, output: prev.output + chunk } : prev));
+        const finish = (fields) => setPolish((prev) => (prev ? { ...prev, ...fields } : prev));
+        try {
+          const res = await fetch('ganleme/polish', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            signal: controller.signal,
+            body: JSON.stringify({
+              text: current.source,
+              level: current.draft.level,
+              tone: current.draft.tone,
+              note: current.draft.note,
+              system: current.draft.system,
+
+              language: localeId?.()?.startsWith('zh') ? 'zh' : 'en',
+            }),
+          });
+          if (!res.ok) {
+            const body = await res.json().catch(() => null);
+            finish({ phase: 'idle', error: fmt(t('polish.failed'), { message: body?.message || `HTTP ${res.status}` }) });
+            return;
+          }
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split('\n\n');
+            buffer = parts.pop() ?? '';
+            for (const part of parts) {
+              const line = part.split('\n').find((l) => l.startsWith('data: '));
+              if (!line) continue;
+              let frame;
+              try {
+                frame = JSON.parse(line.slice(6));
+              } catch {
+                continue;
+              }
+              if (frame.type === 'delta') append(frame.text);
+              else if (frame.type === 'done') finish({ phase: 'ready' });
+              else if (frame.type === 'rejected') {
+                finish({ phase: 'ready', error: fmt(t('polish.numbersChanged'), { extra: (frame.extra ?? []).join(', ') }) });
+              } else if (frame.type === 'aborted') finish({ phase: 'stopped' });
+              else if (frame.type === 'error') {
+                finish({ phase: 'idle', error: fmt(t('polish.failed'), { message: frame.message }) });
+              }
+            }
+          }
+          setPolish((prev) => (prev && prev.phase === 'streaming' ? { ...prev, phase: 'ready' } : prev));
+        } catch (error) {
+          if (controller.signal.aborted) setPolish((prev) => (prev ? { ...prev, phase: 'stopped' } : prev));
+          else setPolish((prev) => (prev ? { ...prev, phase: 'idle', error: fmt(t('polish.failed'), { message: String(error?.message ?? error) }) } : prev));
+        } finally {
+          if (polishAbortRef.current === controller) polishAbortRef.current = null;
+        }
+      };
+
+      /** Apply the (possibly hand-edited) rewrite to the report on screen. */
+      const applyPolish = () => {
+        if (!polish) return;
+        const candidate = String(polish.output ?? '').trim();
+        if (!candidate) return;
+        // Guard runs again on the edited text: a manual edit is not trusted either.
+        const guard = checkPolishNumbers(polish.source, candidate);
+        if (guard.ok === false) {
+          setPolish((prev) => (prev ? { ...prev, error: fmt(t('polish.numbersChanged'), { extra: guard.extra.join(', ') }) } : prev));
+          return;
+        }
+        setReport((prev) => (prev ? { ...prev, text: candidate, original: prev.original ?? prev.text, polished: true } : prev));
+        closePolish();
+      };
+
       const copyReport = () => {
         const text = report?.text;
         if (!text) return;
@@ -2739,7 +3116,26 @@ window.__ModuleLoader__.load({
                 copied,
                 onCopy: copyReport,
                 onSettings: openReportSettings,
+                onPolish: openPolish,
+                canPolish,
+                showOriginal,
+                onToggleOriginal: setShowOriginal,
                 onClose: () => setReport(null),
+              })
+            : null,
+          polish
+            ? h(PolishSheet, {
+                draft: polish.draft,
+                onDraft: (draft) => setPolish((prev) => (prev ? { ...prev, draft } : prev)),
+                phase: polish.phase,
+                output: polish.output,
+                onOutput: (output) => setPolish((prev) => (prev ? { ...prev, output } : prev)),
+                error: polish.error,
+                onStart: startPolish,
+                onStop: stopPolish,
+                onApply: applyPolish,
+                onCancel: closePolish,
+                t,
               })
             : null,
           draftConfig
@@ -2830,6 +3226,10 @@ window.__ModuleLoader__.load({
         DEFAULT_REPORT_CONFIG,
         PREVIEW_DATA,
         COMMIT_TYPES,
+        POLISH_LEVELS,
+        POLISH_TONES,
+        PolishSheet,
+        polishSource,
         loadManualBg,
         manualBgSet,
         manualBgGet,

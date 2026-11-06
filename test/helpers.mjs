@@ -105,6 +105,44 @@ export async function makeHost({ workspaces = [], config = {}, services = {} } =
   const resolved = host.Config(config);
   host.apply(ctx, resolved);
 
+  /**
+   * Drive a streaming route: collect SSE frames and the raw body.
+   * @returns `{ status, frames, body }` once the handler settles.
+   */
+  async function callStream(path, { method = 'POST', body } = {}) {
+    const route = routes.get(path.split('?')[0]);
+    if (!route) return { status: 404, frames: [], body: '' };
+    const frames = [];
+    let raw = '';
+    const res = {
+      statusCode: 0,
+      headers: {},
+      setHeader(key, value) {
+        this.headers[key.toLowerCase()] = value;
+      },
+      write(chunk) {
+        raw += chunk;
+        for (const block of String(chunk).split('\n\n')) {
+          const line = block.split('\n').find((l) => l.startsWith('data: '));
+          if (line) frames.push(JSON.parse(line.slice(6)));
+        }
+        return true;
+      },
+      end() {},
+    };
+    const req = {
+      method,
+      url: path,
+      headers: {},
+      on() {},
+      async *[Symbol.asyncIterator]() {
+        if (body !== undefined) yield Buffer.from(JSON.stringify(body));
+      },
+    };
+    await route.handler(req, res);
+    return { status: res.statusCode, frames, raw, headers: res.headers };
+  }
+
   async function call(path, { method = 'GET', body } = {}) {
     const route = routes.get(path.split('?')[0]);
     if (!route) return { status: 404, json: null };
@@ -131,7 +169,7 @@ export async function makeHost({ workspaces = [], config = {}, services = {} } =
     return { status: res.statusCode, json: res.body ? JSON.parse(res.body) : null, headers: res.headers };
   }
 
-  return { host, ctx, routes, call, config: resolved };
+  return { host, ctx, routes, call, callStream, config: resolved };
 }
 
 /** Stats for a custom window, or a preset range when `range` is given. */

@@ -39,6 +39,13 @@ function makeRoot(serviceNames, impls = {}) {
     subprocess: { resolveExecutable: async () => 'git' },
     configEditor: { entries: () => [], edit: async () => {} },
     directoryPickerController: { pick: async () => null },
+    llm: {
+      listProviders: () => [{ id: 'fake', name: 'Fake' }],
+      async *stream() {
+        yield { type: 'text-delta', index: 0, text: '本期完成 3 次提交。' };
+        yield { type: 'finish', reason: { kind: 'stop' } };
+      },
+    },
   };
   for (const name of serviceNames) {
     const impl = { ...defaults[name], ...impls[name] };
@@ -123,4 +130,55 @@ test('self-update reaches pluginManager through the real dependency guard', { sk
   } finally {
     globalThis.fetch = realFetch;
   }
+});
+
+test('polish reaches the llm service through the real dependency guard', { skip }, async () => {
+  const host = await loadHost();
+  const { root, routes } = makeRoot([...CORE, 'llm']);
+  root.plugin(host, { polishModel: 'fake-1' });
+  await settle();
+  const res = {
+    statusCode: 0,
+    body: '',
+    headers: {},
+    setHeader(key, value) {
+      this.headers[key.toLowerCase()] = value;
+    },
+    write(chunk) {
+      this.body += chunk;
+      return true;
+    },
+    end() {},
+  };
+  const req = {
+    method: 'POST',
+    url: '/ganleme/polish',
+    headers: {},
+    on() {},
+    async *[Symbol.asyncIterator]() {
+      yield Buffer.from(JSON.stringify({ text: '本期共提交 3 次。', provider: 'fake', model: 'fake-1' }));
+    },
+  };
+  await routes.get('/ganleme/polish').handler(req, res);
+  assert.equal(res.statusCode, 200);
+  assert.match(res.headers['content-type'], /text\/event-stream/);
+  const frames = res.body
+    .split('\n\n')
+    .map((block) => block.split('\n').find((l) => l.startsWith('data: ')))
+    .filter(Boolean)
+    .map((line) => JSON.parse(line.slice(6)));
+  assert.ok(frames.some((f) => f.type === 'delta' && f.text.includes('本期完成')));
+  assert.equal(frames.at(-1).type, 'done');
+});
+
+test('without llm the polish route stays closed and meta says so', { skip }, async () => {
+  const host = await loadHost();
+  const { root, routes } = makeRoot(CORE);
+  root.plugin(host, {});
+  await settle();
+  assert.equal((await request(routes, '/ganleme/meta')).json.polish, false);
+  const res = { statusCode: 0, body: '', setHeader() {}, end(p) { this.body = p ?? ''; } };
+  const req = { method: 'POST', url: '/ganleme/polish', headers: {}, on() {}, async *[Symbol.asyncIterator]() { yield Buffer.from('{"text":"x"}'); } };
+  await routes.get('/ganleme/polish').handler(req, res);
+  assert.equal(res.statusCode, 501);
 });

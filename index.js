@@ -38,7 +38,7 @@ export const name = 'ganleme';
 export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess'];
 
 /** Optional services, captured on demand; see `captureOptional` in apply(). */
-const OPTIONAL_SERVICES = ['pluginManager', 'configEditor', 'directoryPickerController'];
+const OPTIONAL_SERVICES = ['pluginManager', 'configEditor', 'directoryPickerController', 'llm', 'agents'];
 
 export const Config = z.object({
   /** Additional directories scanned for git repositories (see scanDepth). */
@@ -67,6 +67,16 @@ export const Config = z.object({
   updatePackage: z.string().default('dsh-ganleme'),
   /** Registry asked for the latest version lookup; installs follow the profile's registry plan. */
   updateRegistry: z.string().default('https://registry.npmjs.org/'),
+  /** Provider route for polish when the client sends none; empty follows the Session. */
+  polishProvider: z.string().default(''),
+  /** Model id pinned for polish; empty follows the Session route. */
+  polishModel: z.string().default(''),
+  /** Default AI polish level: items | paragraph | summary. */
+  polishLevel: z.string().default('items'),
+  /** Default AI polish tone: plain | report | natural. */
+  polishTone: z.string().default('plain'),
+  /** Output ceiling for one polish call, in tokens. */
+  polishMaxTokens: z.number().min(128).max(16_000).default(2000),
 });
 
 const RANGES = new Set(['today', 'yesterday', 'week', 'month']);
@@ -521,6 +531,78 @@ function buildTotals(results) {
 }
 
 // ---------------------------------------------------------------------------
+// AI polish: prompt construction and the number guard
+// ---------------------------------------------------------------------------
+
+/** Rewrite levels, most conservative first. */
+export const POLISH_LEVELS = ['items', 'paragraph', 'summary'];
+/** Tones a caller may ask for. */
+export const POLISH_TONES = ['plain', 'report', 'natural'];
+
+/**
+ * The instruction per level. Each keeps the rule that facts are fixed; they
+ * differ only in how much structure may be collapsed.
+ */
+const LEVEL_INSTRUCTIONS = {
+  items: 'Rewrite the wording of each bullet. Keep the per-repository structure and the exact number of bullets: do not merge, split, add, or drop any.',
+  paragraph: 'Merge the bullets of each repository into one connected paragraph. You may join them with commas, semicolons or words like "also"; never merge across repositories and never add facts.',
+  summary: 'Condense each repository into a single sentence describing what was done in this period. Keep every repository that has work.',
+};
+
+const TONE_INSTRUCTIONS = {
+  plain: 'Write plainly and directly, like a competent engineer writing for colleagues.',
+  report: 'Write in a formal status-report register suitable for a manager.',
+  natural: 'Write naturally, as a person would describe the work in conversation.',
+};
+
+/**
+ * Build the system prompt for one polish request.
+ * @param {object} options level/tone ids, `language` ('zh' | 'en'), and an
+ *   optional user `note` appended as extra guidance.
+ * @param {string} options.text the original report, shown to the model.
+ * @returns the system prompt text.
+ */
+export function buildPolishPrompt({ level = 'items', tone = 'plain', language = 'zh', note = '' } = {}) {
+  const chosenLevel = POLISH_LEVELS.includes(level) ? level : 'items';
+  const chosenTone = POLISH_TONES.includes(tone) ? tone : 'plain';
+  const outputLanguage = language === 'en' ? 'English' : 'Chinese';
+  const rules = [
+    'You are editing a work report, not writing a new one.',
+    LEVEL_INSTRUCTIONS[chosenLevel],
+    TONE_INSTRUCTIONS[chosenTone],
+    '',
+    'Hard rules:',
+    '1. Use only facts that appear in the text. Never add, guess, or evaluate work that is not written there.',
+    '2. Every number in the text (commit counts, added/deleted lines, times) must stay exactly as written. Do not convert, round, or rephrase numbers into words.',
+    '3. Do not change repository names.',
+    '4. Keep the report title and date line if the original has them.',
+    '5. If unsure, keep the original wording. Plain is better than invented.',
+    `6. Write the result in ${outputLanguage}.`,
+  ];
+  if (String(note ?? '').trim()) {
+    rules.push('', `Extra guidance from the user (honour it within the hard rules above): ${String(note).trim()}`);
+  }
+  return rules.join('\n');
+}
+
+/** Every number in a text, as written (decimal point kept, no sign). */
+export function extractNumbers(text) {
+  return new Set(String(text ?? '').match(/\d+(?:\.\d+)?/gu) ?? []);
+}
+
+/**
+ * Check that a candidate keeps the original's facts.
+ * A candidate may not mention a number the original never had; dropping a
+ * number is allowed (a summary may omit line counts).
+ * @returns `{ ok: true }` or `{ ok: false, extra: string[] }`.
+ */
+export function checkPolishNumbers(original, candidate) {
+  const allowed = extractNumbers(original);
+  const extra = [...extractNumbers(candidate)].filter((n) => !allowed.has(n));
+  return extra.length === 0 ? { ok: true, extra: [] } : { ok: false, extra };
+}
+
+// ---------------------------------------------------------------------------
 // Self-update: check the npm registry and reinstall through pluginManager
 // ---------------------------------------------------------------------------
 
@@ -871,6 +953,8 @@ export function apply(ctx, config) {
           sendJson(res, 200, {
             version: currentVersion(),
             update: update ? { pkg: update.pkg } : null,
+            // The browser hides the polish entry when the Host cannot do it.
+            polish: !polishRouteOf().error,
             // Failures stay visible after the plugin restarts on its old version.
             lastUpdate: last && last.phase === 'failed' ? { from: last.from, to: last.to, error: last.error, at: last.at } : null,
           });
@@ -954,6 +1038,181 @@ export function apply(ctx, config) {
         },
       }),
     'ganleme: POST /ganleme/update/install',
+  );
+
+
+  // --- AI polish: stream a rewritten report, guarded by the number check ----
+  // The model is reached through the composition's `llm` service; without it
+  // the route reports itself unavailable and the client hides the button.
+
+  /** Route path serving one streamed polish request. */
+  const POLISH_ROUTE = '/ganleme/polish';
+
+  /** Resolve the model route for a polish call, or a reason it is unavailable. */
+  const polishRouteOf = () => {
+    const llm = optional.llm;
+    if (!llm || typeof llm.stream !== 'function') return { error: 'llm-unavailable' };
+    let providers = [];
+    try {
+      providers = llm.listProviders() ?? [];
+    } catch {
+      providers = [];
+    }
+    if (!Array.isArray(providers) || providers.length === 0) return { error: 'no-providers' };
+    return { llm, providers };
+  };
+
+  /**
+   * The model route this Session is already using. A running Agent carries the
+   * exact provider/model of its latest request header, which is the same route
+   * the conversation uses; the page is a root-scoped panel with no Session of
+   * its own, so this is the only honest source.
+   */
+  const sessionModelRoute = () => {
+    const agents = optional.agents;
+    if (!agents || typeof agents.list !== 'function') return null;
+    let list = [];
+    try {
+      list = agents.list() ?? [];
+    } catch {
+      return null;
+    }
+    // Prefer an agent that is actually talking right now.
+    const ranked = [...list].sort((a, b) => {
+      const rank = (agent) => (agent?.status === 'running' ? 0 : 1);
+      return rank(a) - rank(b);
+    });
+    for (const agent of ranked) {
+      try {
+        const route = agent?.session?.requestHeader?.()?.config;
+        if (route?.provider && route?.model) return { provider: route.provider, model: route.model };
+      } catch {
+        // A disposed or cold session has no header; try the next one.
+      }
+    }
+    return null;
+  };
+
+  /**
+   * Resolve the model route: the caller's explicit choice, then a pinned config
+   * model, then whatever this Session is using. Nothing guesses a model name.
+   */
+  const polishModelOf = (providers, body) => {
+    const wantedProvider = typeof body?.provider === 'string' ? body.provider.trim() : '';
+    const wantedModel = typeof body?.model === 'string' ? body.model.trim() : '';
+    if (wantedProvider && wantedModel) return { provider: wantedProvider, model: wantedModel };
+    const pinned = String(config.polishModel ?? '').trim();
+    if (pinned) {
+      const provider = wantedProvider || String(config.polishProvider ?? '').trim() || providers[0]?.id || '';
+      return { provider, model: pinned };
+    }
+    return sessionModelRoute() ?? { provider: '', model: '' };
+  };
+
+  /** Write one server-sent event frame. */
+  const sendEvent = (res, data) => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
+  };
+
+  ctx.effect(
+    () =>
+      ctx.webServer.register({
+        kind: 'exact',
+        path: POLISH_ROUTE,
+        handler: async (req, res) => {
+          if (rejected(req, res)) return;
+          if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
+          let body = null;
+          try {
+            const text = await readBoundedBody(req, 256 * 1024);
+            body = text === null ? null : parseJsonBody(text);
+          } catch {
+            body = null;
+          }
+          const original = typeof body?.text === 'string' ? body.text : '';
+          if (!original.trim()) {
+            sendJson(res, 400, { code: 'bad-request', message: 'text is required' });
+            return;
+          }
+          const route = polishRouteOf();
+          if (route.error) {
+            sendJson(res, 501, { code: route.error, message: 'AI polish is not available in this deployment' });
+            return;
+          }
+          const { provider, model } = polishModelOf(route.providers, body);
+          if (!provider || !model) {
+            sendJson(res, 422, {
+              code: 'no-model',
+              message: 'no Session model route is available; start a conversation or set polishProvider/polishModel',
+            });
+            return;
+          }
+          res.statusCode = 200;
+          res.setHeader('content-type', 'text/event-stream; charset=utf-8');
+          res.setHeader('cache-control', 'no-store');
+          res.setHeader('connection', 'keep-alive');
+          const controller = new AbortController();
+          req.on?.('close', () => controller.abort());
+          let text = '';
+          try {
+            const system = typeof body?.system === 'string' && body.system.trim()
+              ? body.system
+              : buildPolishPrompt({
+                  level: body?.level ?? config.polishLevel,
+                  tone: body?.tone ?? config.polishTone,
+                  language: body?.language === 'en' ? 'en' : 'zh',
+                  note: body?.note,
+                });
+            const stream = route.llm.stream({
+              provider,
+              model,
+              system,
+              messages: [{ role: 'user', content: [{ type: 'text', text: original }] }],
+              temperature: 0.3,
+              maxTokens: config.polishMaxTokens,
+              purpose: 'ganleme-polish',
+              signal: controller.signal,
+            });
+            for await (const chunk of stream) {
+              if (chunk.type === 'text-delta' && typeof chunk.text === 'string') {
+                text += chunk.text;
+                sendEvent(res, { type: 'delta', text: chunk.text });
+              } else if (chunk.type === 'finish') {
+                if (chunk.reason?.kind === 'error' || chunk.reason?.kind === 'aborted') {
+                  sendEvent(res, {
+                    type: 'error',
+                    code: chunk.reason.kind,
+                    message: String(chunk.reason?.failure?.message ?? chunk.reason.kind).slice(0, 300),
+                  });
+                  res.end();
+                  return;
+                }
+              }
+            }
+            // The guard runs before the client may apply the rewrite.
+            const guard = checkPolishNumbers(original, text);
+            if (!guard.ok) {
+              sendEvent(res, {
+                type: 'rejected',
+                code: 'numbers-changed',
+                message: `the rewrite introduced numbers that are not in the original: ${guard.extra.join(', ')}`,
+                extra: guard.extra,
+              });
+            } else {
+              sendEvent(res, { type: 'done', provider, model });
+            }
+          } catch (error) {
+            if (controller.signal.aborted) {
+              sendEvent(res, { type: 'aborted' });
+            } else {
+              sendEvent(res, { type: 'error', code: 'polish-failed', message: String(error?.message ?? error).slice(0, 300) });
+            }
+          } finally {
+            res.end();
+          }
+        },
+      }),
+    'ganleme: POST /ganleme/polish',
   );
 
   // --- extra project roots: list / add / remove, persisted via configEditor ---

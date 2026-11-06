@@ -332,6 +332,77 @@ test('switching style clears manual overrides so the style takes effect', async 
   assert.ok(!/\d{2}:\d{2}/.test(text), 'no times after switching to worklog');
 });
 
+test('the polish entry is offered only for a finished report', async () => {
+  const mod = await loadClient();
+  const T = mod.__test;
+  assert.equal(T.polishSource(null), null);
+  assert.equal(T.polishSource({ text: '' }), null);
+  assert.equal(T.polishSource({ text: '   ' }), null);
+  assert.equal(T.polishSource({ text: '日报 · 2026-11-05' }), '日报 · 2026-11-05');
+});
+
+test('the polish sheet renders its choices and the result area', async () => {
+  const captured = [];
+  const React = {
+    ...fakeReact(),
+    createElement: (type, props, ...kids) => {
+      const node = { type, props: { ...props, children: kids.length === 1 ? kids[0] : kids } };
+      captured.push(node);
+      return node;
+    },
+  };
+  const mod = await loadClient({ react: React });
+  const render = (overrides = {}) => {
+    captured.length = 0;
+    mod.__test.PolishSheet({
+      draft: { level: 'items', tone: 'plain', note: '', system: '' },
+      onDraft() {}, phase: 'idle', output: '', onOutput() {}, error: '',
+      onStart() {}, onStop() {}, onApply() {}, onCancel() {}, t: (k) => k,
+      ...overrides,
+    });
+    return captured;
+  };
+  const idle = render();
+  const choiceKeys = idle.filter((c) => c.type === 'button').map((c) => c.props.key).filter(Boolean);
+  assert.deepEqual(choiceKeys.filter((k) => ['items', 'paragraph', 'summary'].includes(k)), ['items', 'paragraph', 'summary']);
+  assert.deepEqual(choiceKeys.filter((k) => ['plain', 'report', 'natural'].includes(k)), ['plain', 'report', 'natural']);
+  assert.ok(idle.some((c) => c.type === 'textarea' && c.props.className.includes('gl-textarea')), 'note and prompt are editable');
+  assert.ok(idle.some((c) => c.type === 'details'), 'the prompt is inspectable');
+
+  // While streaming the result is read-only and a Stop button appears.
+  const streaming = render({ phase: 'streaming', output: '正在' });
+  assert.ok(!streaming.some((c) => c.type === 'textarea' && String(c.props.className).includes('gl-textareaFill')), 'no editor yet');
+  assert.ok(streaming.some((c) => c.type === 'button' && c.props.children === 'polish.stop'));
+
+  // Once ready the result becomes an editable textarea and Apply is enabled.
+  const ready = render({ phase: 'ready', output: '改写后的日报' });
+  const editor = ready.find((c) => c.type === 'textarea' && String(c.props.className).includes('gl-textareaFill'));
+  assert.ok(editor, 'result is editable');
+  assert.equal(editor.props.value, '改写后的日报');
+  const apply = ready.find((c) => c.type === 'button' && c.props.children === 'polish.apply');
+  assert.equal(apply.props.disabled, false);
+});
+
+test('a rejected rewrite is explained, and apply stays available for hand edits', async () => {
+  const captured = [];
+  const React = {
+    ...fakeReact(),
+    createElement: (type, props, ...kids) => {
+      const node = { type, props: { ...props, children: kids.length === 1 ? kids[0] : kids } };
+      captured.push(node);
+      return node;
+    },
+  };
+  const mod = await loadClient({ react: React });
+  captured.length = 0;
+  mod.__test.PolishSheet({
+    draft: { level: 'items', tone: 'plain', note: '', system: '' },
+    onDraft() {}, phase: 'ready', output: '本期共提交 9 次', onOutput() {}, error: 'polish.numbersChanged',
+    onStart() {}, onStop() {}, onApply() {}, onCancel() {}, t: (k) => k,
+  });
+  assert.ok(captured.some((c) => c.props.role === 'alert'), 'the number guard explains itself');
+});
+
 test('repos without git identity are named in mine reports', () => {
   const extra = { ...data, repos: [...data.repos, { key: 'c', title: 'repo-c', ok: true, me: null, stats: stats(1, 1), mine: stats(0, 0), commits: [] }] };
   assert.ok(T.buildReport(t, 'daily', extra, 'mine', 'plain', { style: 'worklog' }).includes('repo-c'));
