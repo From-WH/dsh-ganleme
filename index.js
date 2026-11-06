@@ -53,6 +53,8 @@ export const Config = z.object({
   cacheMs: z.number().default(60_000),
   /** Override for "my" author email; beats each repository's git user.email. */
   myEmail: z.string().default(''),
+  /** More of "my" author emails (work, personal…); matched case-insensitively. */
+  myEmails: z.array(z.string()).default([]),
   /** Override for "my" author name; used when no email identity resolves. */
   myName: z.string().default(''),
   /** npm package name this plugin publishes under; empty disables remote updates. */
@@ -344,21 +346,32 @@ export async function listRepos(ctx, config) {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve "my" identity for one repository. A configured `myEmail`/`myName`
- * beats the repository's git config; the email identity wins over the name
- * so a colleague who happens to share the display name is never counted.
+ * Resolve "my" identity for one repository. Configured emails (`myEmails`,
+ * `myEmail`) replace the repository's git user.email; email wins over name so
+ * a colleague who happens to share the display name is never counted. Emails
+ * compare case-insensitively: git keeps whatever case the author typed.
  */
 async function resolveIdentity(git, repo, config) {
   const [emailRun, nameRun] = await Promise.all([
     runGit(git, ['-C', repo.path, 'config', 'user.email'], repo.path, 5_000),
     runGit(git, ['-C', repo.path, 'config', 'user.name'], repo.path, 5_000),
   ]);
-  const repoEmail = emailRun.ok ? emailRun.stdout.trim() : '';
-  const repoName = nameRun.ok ? nameRun.stdout.trim() : '';
-  const email = (config.myEmail || repoEmail).trim();
-  const name = (config.myName || repoName).trim();
-  if (!email && !name) return null;
-  return { email: email || null, name: name || null };
+  const configured = [config.myEmail, ...(config.myEmails ?? [])]
+    .map((e) => String(e ?? '').trim().toLowerCase())
+    .filter(Boolean);
+  const repoEmail = emailRun.ok ? emailRun.stdout.trim().toLowerCase() : '';
+  const emails = [...new Set(configured.length > 0 ? configured : repoEmail ? [repoEmail] : [])];
+  const name = (config.myName || (nameRun.ok ? nameRun.stdout.trim() : '')).trim();
+  if (emails.length === 0 && !name) return null;
+  return { email: emails[0] ?? null, emails, name: name || null };
+}
+
+/** Commit matcher for an identity: any listed email, else the name. */
+export function identityMatcher(me) {
+  if (!me) return null;
+  const emails = new Set((me.emails ?? (me.email ? [me.email] : [])).map((e) => e.toLowerCase()));
+  if (emails.size > 0) return ({ email }) => emails.has(String(email ?? '').trim().toLowerCase());
+  return ({ name }) => name === me.name;
 }
 
 async function repoStats(git, repo, window, config) {
@@ -381,9 +394,7 @@ async function repoStats(git, repo, window, config) {
   if (!logRun.ok) {
     return { ...repo, ok: false, error: logRun.error };
   }
-  const isMine = me
-    ? ({ email, name }) => (me.email ? email === me.email : name === me.name)
-    : null;
+  const isMine = identityMatcher(me);
   const commits = parseLog(logRun.stdout, window, isMine);
   return {
     ...repo,

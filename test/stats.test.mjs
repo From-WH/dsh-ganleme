@@ -29,6 +29,34 @@ test('"mine" uses the repository git identity', async () => {
   assert.equal(json.repos[0].commits.find((c) => c.subject === 'colleague').mine, false);
 });
 
+test('"mine" matches emails case-insensitively', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'mixed case', date: at(-2), email: 'Zhang@Dev.Local' });
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }] });
+  assert.equal((await stats(call, { from: D, to: D })).json.mine.commits, 1);
+});
+
+test('"mine" accepts several configured emails', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'work', date: at(-2), email: 'zhang@corp.example' });
+  commit(repo, { message: 'home', date: at(-2, '11:00'), email: 'zhang@home.example' });
+  commit(repo, { message: 'other', date: at(-2, '12:00'), email: 'li@corp.example', name: '李四' });
+  const { call } = await makeHost({
+    workspaces: [{ path: repo, title: 'r' }],
+    config: { myEmails: ['Zhang@Corp.Example', 'zhang@home.example'] },
+  });
+  const { json } = await stats(call, { from: D, to: D });
+  assert.equal(json.mine.commits, 2);
+  assert.deepEqual(json.repos[0].commits.filter((c) => c.mine).map((c) => c.subject).sort(), ['home', 'work']);
+});
+
+test('the legacy myEmail setting still works alongside myEmails', async () => {
+  const repo = makeRepo();
+  commit(repo, { message: 'legacy', date: at(-2), email: 'old@x.example' });
+  const { call } = await makeHost({ workspaces: [{ path: repo, title: 'r' }], config: { myEmail: 'old@x.example' } });
+  assert.equal((await stats(call, { from: D, to: D })).json.mine.commits, 1);
+});
+
 test('a past window is bounded by --until even with a tiny commitLimit', async () => {
   const repo = makeRepo();
   commit(repo, { message: 'in window', date: at(-3) });
