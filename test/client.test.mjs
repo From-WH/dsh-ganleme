@@ -16,6 +16,9 @@ const zh = {
   'report.detailPlain': '二、分仓库明细',
   'report.repoLine': '{commits} 次提交，新增 {additions} 行，删除 {deletions} 行',
   'report.truncated': '（仅展示前 20 条）',
+  'report.truncatedCount': '（还有 {n} 条未展示）',
+  'report.overviewBodyNoLines': '本期共提交 {commits} 次，涉及 {repos} 个仓库。',
+  'report.repoLineNoLines': '{commits} 次提交',
   'report.emptyBody': '本期没有提交记录。',
   'report.errors': '无法统计的仓库',
   'report.noIdentityNote': '注意：以下仓库未配置 git 身份，你的提交无法识别，未计入：{repos}',
@@ -26,7 +29,7 @@ const zh = {
 };
 const t = (k) => zh[k] ?? `<${k}>`;
 
-const c = (hash, subject, author, time, mine, ins) => ({ hash, author, email: '', subject, time, mine, insertions: ins, deletions: 0, files: 1, paths: [] });
+const commit = (hash, subject, author, time, mine, ins, del = 0) => ({ hash, author, email: '', subject, time, mine, insertions: ins, deletions: del, files: 1, paths: [] });
 const stats = (commits, ins) => ({ commits, insertions: ins, deletions: 0, files: commits, authors: [] });
 const data = {
   from: '2026-11-04T16:00:00.000Z',
@@ -38,46 +41,94 @@ const data = {
     {
       key: 'a', title: 'repo-a', ok: true, branch: 'master', me: { email: 'z@x' },
       stats: stats(2, 1), mine: stats(2, 1),
-      commits: [c('e78ebb9', 'refactor: 重命名', '张三', '2026-11-04T07:40:00.000Z', true, 0), c('e1fc45b', 'fix: 修复', '张三', '2026-11-04T06:10:00.000Z', true, 1)],
+      commits: [commit('e78ebb9', 'refactor: 重命名', '张三', '2026-11-04T07:40:00.000Z', true, 0), commit('e1fc45b', 'fix: 修复', '张三', '2026-11-04T06:10:00.000Z', true, 1)],
     },
     {
       key: 'b', title: 'repo-b', ok: true, branch: 'main', me: { email: 'l@x' },
       stats: stats(1, 2), mine: stats(0, 0),
-      commits: [c('ab81078', 'docs: 补充', '李四', '2026-11-04T03:00:00.000Z', false, 2)],
+      commits: [commit('ab81078', 'docs: 补充', '李四', '2026-11-04T03:00:00.000Z', false, 2)],
     },
   ],
 };
 
-test('plain detailed report: headings, branch, time, no Markdown, mine excludes others', () => {
-  const text = T.buildReport(t, 'daily', data, 'mine', 'plain', false);
-  assert.ok(text.startsWith('日报 · 2026-11-05'));
-  assert.ok(text.includes('一、总览') && text.includes('二、分仓库明细'));
-  assert.ok(text.includes('1. repo-a（master）'));
-  assert.ok(text.includes('15:40'));
-  assert.ok(!text.includes('#') && !text.includes('`'));
-  assert.ok(!text.includes('repo-b'));
+test('worklog style: what was done only, no prefix, time, or line counts', () => {
+  const text = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'worklog' });
+  assert.ok(text.startsWith('日报 · 2026-11-05'), 'keeps the date');
+  assert.ok(!text.includes('统计范围'), 'no range line');
+  assert.ok(!text.includes('一、总览') && !text.includes('二、分仓库明细'), 'no section headings');
+  assert.ok(text.includes('1. repo-a'));
+  assert.ok(text.includes('   - 重命名'), 'refactor: prefix is stripped');
+  assert.ok(text.includes('   - 修复'), 'fix: prefix is stripped');
+  assert.ok(!text.includes('+0/-0') && !text.includes('新增'), 'line counts are gone');
+  assert.ok(!text.includes('15:40'), 'no commit times');
   assert.ok(!text.includes('张三'), 'mine scope omits the author');
+  assert.ok(!text.includes('repo-b'));
+  assert.ok(!text.includes('#') && !text.includes('`'));
 });
 
-test('plain brief report: overview first, no time, no headings', () => {
-  const text = T.buildReport(t, 'daily', data, 'mine', 'plain', true);
-  assert.ok(text.startsWith('本期共提交 2 次'));
-  assert.ok(!text.includes('15:40') && !text.includes('一、总览') && !text.includes('（master）'));
-  assert.ok(text.includes('   - refactor: 重命名（+0/-0）'));
+test('detailed style keeps everything', () => {
+  const text = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'detailed' });
+  assert.ok(text.includes('统计范围') && text.includes('一、总览') && text.includes('二、分仓库明细'));
+  assert.ok(text.includes('1. repo-a（master）'), 'branch kept');
+  assert.ok(text.includes('15:40'), 'time kept');
+  assert.ok(text.includes('（李四 11:00 +2/-0）'), 'author, time and lines kept');
+  assert.ok(text.includes('refactor: 重命名'), 'prefix kept');
+  const md = T.buildReport(t, 'daily', data, 'all', 'markdown', { style: 'detailed' });
+  assert.ok(md.startsWith('# 日报') && md.includes('`e78ebb9`'));
 });
 
-test('all scope keeps author names; Markdown keeps hashes when detailed', () => {
-  const all = T.buildReport(t, 'daily', data, 'all', 'plain', false);
-  assert.ok(all.includes('（李四 +2/-0）'));
-  const md = T.buildReport(t, 'daily', data, 'all', 'markdown', false);
-  assert.ok(md.startsWith('# 日报') && md.includes('`e78ebb9`') && md.includes('— 李四'));
-  const mdBrief = T.buildReport(t, 'daily', data, 'mine', 'markdown', true);
-  assert.ok(!mdBrief.includes('`e78ebb9`') && !mdBrief.includes('# 日报'));
+test('brief and standard styles sit between the two', () => {
+  const brief = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'brief' });
+  assert.ok(brief.includes('本期共提交 2 次，新增 1 行'), 'overview keeps line counts');
+  assert.ok(!brief.includes('15:40'), 'brief still hides times');
+  assert.ok(!brief.includes('3 次提交'), 'no per-repo stats line');
+  const standard = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'standard' });
+  assert.ok(standard.includes('2 次提交，新增 1 行，删除 0 行'), 'standard shows the repo stats line');
+  assert.ok(standard.includes('15:40'), 'standard shows times');
+});
+
+test('toggles override a style without changing the skeleton', () => {
+  const withLines = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'worklog', overrides: { lines: true } });
+  assert.ok(withLines.includes('+0/-0'), 'line counts switched on');
+  assert.ok(!withLines.includes('15:40'), 'times still off');
+  const withTimeAuthors = T.buildReport(t, 'daily', data, 'all', 'plain', { style: 'worklog', overrides: { time: true, author: true } });
+  assert.ok(withTimeAuthors.includes('15:40') && withTimeAuthors.includes('张三'));
+  const keepPrefix = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'worklog', overrides: { stripPrefix: false } });
+  assert.ok(keepPrefix.includes('refactor: 重命名'), 'prefix kept when the toggle is off');
+  const noLines = T.buildReport(t, 'daily', data, 'mine', 'plain', { style: 'detailed', overrides: { lines: false } });
+  assert.ok(!noLines.includes('+0/-0') && noLines.includes('本期共提交 2 次，'), 'line counts and overview lines both dropped');
+});
+
+test('the commit limit caps each repository and says how many are hidden', () => {
+  const many = {
+    ...data,
+    repos: [{
+      ...data.repos[0],
+      stats: stats(25, 25), mine: stats(25, 25),
+      commits: Array.from({ length: 25 }, (_, i) => commit(`h${i}`, `改变 ${i}`, '张三', '2026-11-04T07:00:00.000Z', true, 1)),
+    }, data.repos[1]],
+  };
+  const limited = T.buildReport(t, 'daily', many, 'mine', 'plain', { style: 'worklog', limit: 20 });
+  assert.ok(limited.includes('（还有 5 条未展示）'));
+  assert.equal((limited.match(/改变 /g) ?? []).length, 20);
+  const all = T.buildReport(t, 'daily', many, 'mine', 'plain', { style: 'worklog', limit: 0 });
+  assert.equal((all.match(/改变 /g) ?? []).length, 25, 'limit 0 shows everything');
+  assert.ok(!all.includes('未展示'));
+});
+
+test('commit prefixes are stripped only when they are real type tags', () => {
+  assert.equal(T.stripCommitPrefix('fix: 修复登录'), '修复登录');
+  assert.equal(T.stripCommitPrefix('feat(api)!: 新增接口'), '新增接口');
+  assert.equal(T.stripCommitPrefix('perf：优化查询'), '优化查询');
+  assert.equal(T.stripCommitPrefix('修复: 列表错位'), '列表错位');
+  assert.equal(T.stripCommitPrefix('API: add endpoint'), 'API: add endpoint', 'unknown type keeps its prefix');
+  assert.equal(T.stripCommitPrefix('no prefix at all'), 'no prefix at all');
+  assert.equal(T.stripCommitPrefix('fix: '), 'fix:', 'a bare type is not stripped to nothing');
 });
 
 test('repos without git identity are named in mine reports', () => {
   const extra = { ...data, repos: [...data.repos, { key: 'c', title: 'repo-c', ok: true, me: null, stats: stats(1, 1), mine: stats(0, 0), commits: [] }] };
-  assert.ok(T.buildReport(t, 'daily', extra, 'mine', 'plain', true).includes('repo-c'));
+  assert.ok(T.buildReport(t, 'daily', extra, 'mine', 'plain', { style: 'worklog' }).includes('repo-c'));
 });
 
 test('quip pools are large and unique; deck never repeats within a cycle', () => {
@@ -120,7 +171,7 @@ test('date presets and custom range validation', () => {
 
 test('a daily report is dated by the day it covers', () => {
   const yesterday = { ...data, from: '2026-11-03T16:00:00.000Z', to: '2026-11-04T16:00:00.000Z', generatedAt: '2026-11-05T01:00:00.000Z' };
-  assert.ok(T.buildReport(t, 'daily', yesterday, 'mine', 'plain', false).startsWith('日报 · 2026-11-04'));
+  assert.ok(T.buildReport(t, 'daily', yesterday, 'mine', 'plain', { style: 'worklog' }).startsWith('日报 · 2026-11-04'));
 });
 
 test('on the Yesterday tab the daily report button covers yesterday', async () => {
