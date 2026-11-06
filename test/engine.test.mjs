@@ -79,7 +79,7 @@ test('mapLimit keeps order and never exceeds the limit', async () => {
   assert.deepEqual(await host.mapLimit([], 4, async () => 1), []);
 });
 
-test('parseLog: rename paths resolve to the new path', { todo: 'low-priority fix: nested brace renames' }, () => {
+test('parseLog: rename paths resolve to the new path', () => {
   const window = { from: new Date(0), to: new Date('2100-01-01') };
   const cases = {
     'old.js => new.js': 'new.js',
@@ -87,6 +87,8 @@ test('parseLog: rename paths resolve to the new path', { todo: 'low-priority fix
     'src/{a.js => b.js}': 'src/b.js',
     '{lib => src}/x.js': 'src/x.js',
     'src/{ => sub}/y.js': 'src/sub/y.js',
+    'src/{sub => }/z.js': 'src/z.js',
+    'plain/path.js': 'plain/path.js',
   };
   for (const [raw, expected] of Object.entries(cases)) {
     const [commit] = host.parseLog(logBlock({ ts: 1_800_000_000, numstat: `1\t0\t${raw}\n` }), window);

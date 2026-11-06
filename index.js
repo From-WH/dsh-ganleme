@@ -183,6 +183,21 @@ function runGit(git, args, cwd, timeoutMs) {
 }
 
 /**
+ * The destination of a numstat path. git abbreviates renames as `old => new`
+ * or with a shared prefix/suffix: `src/{old => new}/file.js`, where either
+ * side of the braces may be empty.
+ */
+export function renameTarget(rawPath) {
+  const path = String(rawPath ?? '');
+  const brace = /^(.*)\{(.*) => (.*)\}(.*)$/.exec(path);
+  if (brace) {
+    const [, prefix, , to, suffix] = brace;
+    return `${prefix}${to}${suffix}`.replace(/\/{2,}/g, '/');
+  }
+  return path.includes(' => ') ? path.split(' => ').pop() : path;
+}
+
+/**
  * Parse `git log --pretty=format:%x01%H%x02%h%x02%an%x02%ae%x02%at%x02%s
  * --numstat` output into commit records, filtered to the statistics window.
  * `isMine({ name, email })` flags the caller's own commits; when absent every
@@ -211,10 +226,7 @@ export function parseLog(stdout, window, isMine = null) {
       const columns = line.split('\t');
       if (columns.length < 3) continue;
       const [ins, del, rawPath] = columns;
-      // Rename entries render as "old => new" or "prefix/{old => new}".
-      const file = rawPath.includes(' => ')
-        ? (rawPath.split(' => ').pop() ?? '').replace(/\}\s*$/, '')
-        : rawPath;
+      const file = renameTarget(rawPath);
       if (file) files.push(file);
       if (ins !== '-') insertions += Number(ins) || 0;
       if (del !== '-') deletions += Number(del) || 0;
