@@ -2395,7 +2395,7 @@ window.__ModuleLoader__.load({
         range === 'custom'
           ? `ganleme/stats?range=custom&from=${encodeURIComponent(customRange.from)}&to=${encodeURIComponent(customRange.to)}`
           : `ganleme/stats?range=${range}`;
-      const [scope, setScope] = React.useState('all');
+      const [scope, setScope] = React.useState('mine');
       /** Saved report format, or null until the user confirms it once. */
       const [reportConfig, setReportConfig] = React.useState(readReportConfig);
       /** Unsaved edits inside the settings sheet. */
