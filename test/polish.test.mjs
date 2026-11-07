@@ -213,6 +213,70 @@ test('the Session route is taken from a live Agent when nothing is pinned', asyn
   assert.equal(llm.calls[0].model, 'live-1');
 });
 
+test('switching the model takes effect on the next polish', async () => {
+  // Regression: the route came from session.requestHeader(), which records the
+  // last request actually sent. After a switch it still reported the old model,
+  // so polish kept using the model from the first install.
+  const llm = fakeLlm('本期完成 3 次提交。');
+  let live = { provider: 'provider-a', model: 'model-a' };
+  const agents = {
+    list: () => [{
+      status: 'running',
+      // The header stays on the OLD model until a new message is sent.
+      session: { requestHeader: () => ({ config: { provider: 'provider-old', model: 'model-old' } }) },
+      model: { current: () => ({ ...live }) },
+    }],
+  };
+  const { callStream } = await makeHost({ services: { llm, agents } });
+  await callStream('/ganleme/polish', { body: { text: TEXT } });
+  assert.equal(llm.calls[0].provider, 'provider-a');
+  assert.equal(llm.calls[0].model, 'model-a', 'uses the live selection, not the stale header');
+
+  // The user switches model mid-session; the very next polish must follow.
+  live = { provider: 'provider-b', model: 'model-b' };
+  await callStream('/ganleme/polish', { body: { text: TEXT } });
+  assert.equal(llm.calls[1].provider, 'provider-b');
+  assert.equal(llm.calls[1].model, 'model-b', 'the switch is picked up without sending a message first');
+});
+
+test('a pending selection wins over the last used one', async () => {
+  const llm = fakeLlm('本期完成 3 次提交。');
+  const agents = {
+    list: () => [{
+      status: 'inactive',
+      session: { requestHeader: () => ({ config: { provider: 'used', model: 'used-1' } }) },
+      model: { current: () => ({ provider: 'chosen', model: 'chosen-1' }) },
+    }],
+  };
+  const { callStream } = await makeHost({ services: { llm, agents } });
+  await callStream('/ganleme/polish', { body: { text: TEXT } });
+  assert.equal(llm.calls[0].model, 'chosen-1');
+});
+
+test('an Agent exposing only a request header still works', async () => {
+  // Older Agents may lack model.current(); the header is the fallback, not the rule.
+  const llm = fakeLlm('本期完成 3 次提交。');
+  const agents = {
+    list: () => [{ status: 'running', session: { requestHeader: () => ({ config: { provider: 'h', model: 'h-1' } }) } }],
+  };
+  const { callStream } = await makeHost({ services: { llm, agents } });
+  await callStream('/ganleme/polish', { body: { text: TEXT } });
+  assert.equal(llm.calls[0].model, 'h-1');
+});
+
+test('the live Agent is preferred when several are open', async () => {
+  const llm = fakeLlm('本期完成 3 次提交。');
+  const agents = {
+    list: () => [
+      { status: 'inactive', model: { current: () => ({ provider: 'idle', model: 'idle-1' }) } },
+      { status: 'running', model: { current: () => ({ provider: 'busy', model: 'busy-1' }) } },
+    ],
+  };
+  const { callStream } = await makeHost({ services: { llm, agents } });
+  await callStream('/ganleme/polish', { body: { text: TEXT } });
+  assert.equal(llm.calls[0].model, 'busy-1');
+});
+
 test('an Agent without a complete route is skipped', async () => {
   const llm = fakeLlm('本期完成 3 次提交。');
   const agents = {

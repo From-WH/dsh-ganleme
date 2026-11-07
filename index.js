@@ -1063,10 +1063,37 @@ export function apply(ctx, config) {
   };
 
   /**
-   * The model route this Session is already using. A running Agent carries the
-   * exact provider/model of its latest request header, which is the same route
-   * the conversation uses; the page is a root-scoped panel with no Session of
-   * its own, so this is the only honest source.
+   * One Agent's current model route.
+   *
+   * `agent.model.current()` is the live choice: it returns the pending
+   * selection the user just switched to, falling back to the last route used.
+   * `session.requestHeader()` must NOT be the primary source — it records the
+   * header of the last request actually sent, so right after a model switch it
+   * still reports the previous model.
+   */
+  const agentRoute = (agent) => {
+    try {
+      const current = agent?.model?.current?.();
+      if (current?.provider && current?.model) {
+        return { provider: current.provider, model: current.model };
+      }
+    } catch {
+      // An older or partial Agent may not expose model.current(); fall through.
+    }
+    try {
+      const header = agent?.session?.requestHeader?.()?.config;
+      if (header?.provider && header?.model) return { provider: header.provider, model: header.model };
+    } catch {
+      // No usable header on a cold or disposed session.
+    }
+    return null;
+  };
+
+  /**
+   * The model route to use for polish, taken from the live Agent the user is
+   * talking to. The page is a root-scoped panel with no Session of its own, so
+   * this is the only honest source; it is resolved per request, never cached,
+   * so switching models takes effect on the next polish.
    */
   const sessionModelRoute = () => {
     const agents = optional.agents;
@@ -1077,18 +1104,24 @@ export function apply(ctx, config) {
     } catch {
       return null;
     }
-    // Prefer an agent that is actually talking right now.
+    if (list.length === 0) return null;
+    // Prefer an agent that is actually talking right now, then the most recent.
     const ranked = [...list].sort((a, b) => {
       const rank = (agent) => (agent?.status === 'running' ? 0 : 1);
-      return rank(a) - rank(b);
+      const byStatus = rank(a) - rank(b);
+      if (byStatus !== 0) return byStatus;
+      const stamp = (agent) => {
+        try {
+          return Date.parse(agent?.session?.header?.updatedAt ?? agent?.session?.header?.createdAt ?? '') || 0;
+        } catch {
+          return 0;
+        }
+      };
+      return stamp(b) - stamp(a);
     });
     for (const agent of ranked) {
-      try {
-        const route = agent?.session?.requestHeader?.()?.config;
-        if (route?.provider && route?.model) return { provider: route.provider, model: route.model };
-      } catch {
-        // A disposed or cold session has no header; try the next one.
-      }
+      const route = agentRoute(agent);
+      if (route) return route;
     }
     return null;
   };
