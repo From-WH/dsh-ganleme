@@ -770,15 +770,6 @@ export function apply(ctx, config) {
     return promise;
   };
 
-  /** Answer an untrusted/unauthenticated request; true when it was rejected. */
-  const rejected = (req, res) => {
-    const rejection = ctx.connection.requestRejection(req);
-    if (rejection === undefined) return false;
-    res.statusCode = rejection;
-    res.end();
-    return true;
-  };
-
   const sendJson = (res, status, payload) => {
     res.statusCode = status;
     res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -796,9 +787,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/repos',
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           try {
             sendJson(res, 200, { generatedAt: new Date().toISOString(), repos: await cachedRepos(false) });
@@ -814,9 +807,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/stats',
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           const url = new URL(String(req.url), 'http://localhost');
           const range = url.searchParams.get('range') ?? 'today';
@@ -944,9 +939,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/meta',
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           const update = updateConfigOf();
           const last = update ? readUpdateStatus(update.pkg) : null;
@@ -967,9 +964,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: UPDATE_ROUTE,
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           if (updating) {
             sendJson(res, 409, { code: 'update-running', message: 'an update is already running' });
@@ -1004,9 +1003,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/update/install',
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
           const update = updateConfigOf();
           if (!update) {
@@ -1151,9 +1152,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: POLISH_ROUTE,
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
           let body = null;
           try {
@@ -1295,7 +1298,6 @@ export function apply(ctx, config) {
   };
 
   const handleRootsMutation = async (req, res, mode) => {
-    if (rejected(req, res)) return;
     if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
     let body = null;
     try {
@@ -1346,9 +1348,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/roots',
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           sendJson(res, 200, { roots: config.extraRoots ?? [] });
         },
@@ -1362,9 +1366,11 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/roots/pick',
         handler: async (req, res) => {
-          if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
           const picker = optional.directoryPickerController;
           if (!picker || typeof picker.pick !== 'function') {
@@ -1416,6 +1422,9 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/roots/add',
         handler: (req, res) => handleRootsMutation(req, res, 'add'),
       }),
@@ -1426,6 +1435,9 @@ export function apply(ctx, config) {
     () =>
       ctx.webServer.register({
         kind: 'exact',
+        // The composition authenticates this route: a caller without the
+        // browser credential never reaches the handler.
+        auth: 'required',
         path: '/ganleme/roots/remove',
         handler: (req, res) => handleRootsMutation(req, res, 'remove'),
       }),

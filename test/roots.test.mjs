@@ -69,3 +69,25 @@ test('GET /ganleme/roots lists the configured roots', async () => {
   const { call } = await makeHost({ config: { extraRoots: [dir] } });
   assert.deepEqual((await call('/ganleme/roots')).json.roots, [dir]);
 });
+
+test('every route declares framework authentication', async () => {
+  // Regression: the plugin used to call connection.requestRejection() itself.
+  // DSH 0.2.3 replaced that with `auth` on the route plus the webserver's
+  // authorize step, so the old call threw and the server answered 400.
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+  assert.ok(!src.includes('requestRejection'), 'no self-authentication left');
+  const routes = [...src.matchAll(/kind: 'exact',([\s\S]{0,400}?)path: '([^']+)'/g)];
+  assert.ok(routes.length >= 8, `expected every route, found ${routes.length}`);
+  for (const [, between, path] of routes) {
+    assert.match(between, /auth: 'required'/, `${path} declares auth`);
+  }
+});
+
+test('a registered route carries auth through to the server', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../index.js', import.meta.url), 'utf8');
+  // The declaration must be on the route object the plugin hands the server,
+  // not merely somewhere in the file.
+  assert.ok(/webServer\.register\(\{[\s\S]{0,200}auth: 'required'/.test(src), 'auth sits in the registered object');
+});

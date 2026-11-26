@@ -34,7 +34,8 @@ function makeRoot(serviceNames, impls = {}) {
         return () => routes.delete(route.path);
       },
     },
-    connection: { requestRejection: () => undefined },
+    // Authentication moved to the webserver's authorize step; routes declare auth.
+    connection: {},
     workspaceRegistry: { list: () => [] },
     subprocess: { resolveExecutable: async () => 'git' },
     configEditor: { entries: () => [], edit: async () => {} },

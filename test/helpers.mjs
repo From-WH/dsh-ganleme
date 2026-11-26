@@ -88,7 +88,8 @@ export async function makeHost({ workspaces = [], config = {}, services = {} } =
         return () => routes.delete(route.path);
       },
     },
-    connection: { requestRejection: () => undefined },
+    // Authentication moved to the webserver's authorize step; routes declare auth.
+    connection: {},
     workspaceRegistry: { list: () => (typeof workspaces === 'function' ? workspaces() : workspaces) },
     subprocess: { resolveExecutable: async () => 'git' },
     ...services,
