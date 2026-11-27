@@ -71,17 +71,21 @@ test('GET /ganleme/roots lists the configured roots', async () => {
 });
 
 test('every route declares framework authentication', async () => {
-  // Regression: the plugin used to call connection.requestRejection() itself.
-  // DSH 0.2.3 replaced that with `auth` on the route plus the webserver's
-  // authorize step, so the old call threw and the server answered 400.
+  // Regression: on DSH 0.2.3+ the plugin used to call connection.requestRejection()
+  // unconditionally. That method is gone, the call threw, and the webserver
+  // answered 400 for every route. The route-level `auth` is what protects the
+  // handler now; the old call may only survive as a guarded compatibility path.
   const fs = await import('node:fs');
   const src = fs.readFileSync(new URL('../index.js', import.meta.url), 'utf8');
-  assert.ok(!src.includes('requestRejection'), 'no self-authentication left');
   const routes = [...src.matchAll(/kind: 'exact',([\s\S]{0,400}?)path: '([^']+)'/g)];
   assert.ok(routes.length >= 8, `expected every route, found ${routes.length}`);
   for (const [, between, path] of routes) {
     assert.match(between, /auth: 'required'/, `${path} declares auth`);
   }
+  // The legacy call must never be reachable without a capability check.
+  const guard = src.slice(src.indexOf('const rejected = (req, res) =>'), src.indexOf('const sendJson ='));
+  assert.match(guard, /typeof guard\.requestRejection !== 'function'/, 'legacy call is feature-detected');
+  assert.match(guard, /try \{/, 'and wrapped, so a throwing guard cannot 400 every route');
 });
 
 test('a registered route carries auth through to the server', async () => {
@@ -90,4 +94,29 @@ test('a registered route carries auth through to the server', async () => {
   // The declaration must be on the route object the plugin hands the server,
   // not merely somewhere in the file.
   assert.ok(/webServer\.register\(\{[\s\S]{0,200}auth: 'required'/.test(src), 'auth sits in the registered object');
+});
+
+test('an old Harness that authenticates in-plugin still rejects', async () => {
+  // DSH 0.2.1 exposed connection.requestRejection; the plugin must keep honouring it.
+  const { makeHost } = await import('./helpers.mjs');
+  const seen = [];
+  const connection = {
+    requestRejection: (req) => {
+      seen.push(req.url);
+      return req.url.includes('token=good') ? undefined : 401;
+    },
+  };
+  const host = await makeHost({ services: { connection } });
+  const denied = await host.call('/ganleme/stats?range=today');
+  assert.equal(denied.status, 401, 'untrusted request is answered by the guard');
+  const allowed = await host.call('/ganleme/stats?range=today&token=good');
+  assert.equal(allowed.status, 200, 'trusted request reaches the handler');
+  assert.equal(seen.length, 2);
+});
+
+test('a modern Harness without that method is never blocked by it', async () => {
+  // This is the exact shape of the 400 regression: no requestRejection at all.
+  const { makeHost } = await import('./helpers.mjs');
+  const host = await makeHost({ services: { connection: {} } });
+  assert.equal((await host.call('/ganleme/stats?range=today')).status, 200);
 });

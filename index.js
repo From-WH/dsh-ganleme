@@ -35,10 +35,10 @@ export const name = 'ganleme';
  * (A name listed here is required; Cordis keeps the whole plugin inactive
  * until every one exists, and denies access to any name not listed.)
  */
-export const inject = ['webServer', 'connection', 'workspaceRegistry', 'subprocess'];
+export const inject = ['webServer', 'workspaceRegistry', 'subprocess'];
 
 /** Optional services, captured on demand; see `captureOptional` in apply(). */
-const OPTIONAL_SERVICES = ['pluginManager', 'configEditor', 'directoryPickerController', 'llm', 'agents'];
+const OPTIONAL_SERVICES = ['pluginManager', 'configEditor', 'directoryPickerController', 'llm', 'agents', 'connection'];
 
 export const Config = z.object({
   /** Additional directories scanned for git repositories (see scanDepth). */
@@ -770,6 +770,34 @@ export function apply(ctx, config) {
     return promise;
   };
 
+  /**
+   * Authentication compatibility across DSH generations.
+   *
+   * 0.2.1 and earlier: no `auth` on routes; the plugin must reject a request
+   * itself via `connection.requestRejection(req)`.
+   * 0.2.3 and later: `auth` on the route is enforced by the webserver's
+   * authorize step before the handler runs, and `requestRejection` no longer
+   * exists — calling it throws, which the server reports as 400.
+   *
+   * So the route declares `auth` (ignored by the old server) and the handler
+   * runs the old check only when that method actually exists.
+   * @returns true when the request was already answered.
+   */
+  const rejected = (req, res) => {
+    const guard = optional.connection;
+    if (!guard || typeof guard.requestRejection !== 'function') return false;
+    try {
+      const rejection = guard.requestRejection(req);
+      if (rejection === undefined) return false;
+      res.statusCode = rejection;
+      res.end();
+      return true;
+    } catch {
+      // A guard that throws is not this build's contract; the webserver owns it.
+      return false;
+    }
+  };
+
   const sendJson = (res, status, payload) => {
     res.statusCode = status;
     res.setHeader('content-type', 'application/json; charset=utf-8');
@@ -792,6 +820,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: '/ganleme/repos',
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           try {
             sendJson(res, 200, { generatedAt: new Date().toISOString(), repos: await cachedRepos(false) });
@@ -812,6 +841,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: '/ganleme/stats',
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           const url = new URL(String(req.url), 'http://localhost');
           const range = url.searchParams.get('range') ?? 'today';
@@ -944,6 +974,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: '/ganleme/meta',
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           const update = updateConfigOf();
           const last = update ? readUpdateStatus(update.pkg) : null;
@@ -969,6 +1000,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: UPDATE_ROUTE,
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           if (updating) {
             sendJson(res, 409, { code: 'update-running', message: 'an update is already running' });
@@ -1008,6 +1040,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: '/ganleme/update/install',
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
           const update = updateConfigOf();
           if (!update) {
@@ -1157,6 +1190,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: POLISH_ROUTE,
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
           let body = null;
           try {
@@ -1298,6 +1332,7 @@ export function apply(ctx, config) {
   };
 
   const handleRootsMutation = async (req, res, mode) => {
+    if (rejected(req, res)) return;
     if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
     let body = null;
     try {
@@ -1353,6 +1388,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: '/ganleme/roots',
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'GET') return sendMethodNotAllowed(res, 'GET');
           sendJson(res, 200, { roots: config.extraRoots ?? [] });
         },
@@ -1371,6 +1407,7 @@ export function apply(ctx, config) {
         auth: 'required',
         path: '/ganleme/roots/pick',
         handler: async (req, res) => {
+          if (rejected(req, res)) return;
           if (req.method !== 'POST') return sendMethodNotAllowed(res, 'POST');
           const picker = optional.directoryPickerController;
           if (!picker || typeof picker.pick !== 'function') {

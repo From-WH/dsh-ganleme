@@ -1,6 +1,6 @@
 {
   "name": "dsh-ganleme",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "干了么：各工作区 git 提交统计与日报/周报/月报生成",
   "type": "module",
   "license": "MIT",
@@ -33,13 +33,25 @@
     "./locale/*.json": "./locale/*.json",
     "./icon": "./icon.svg"
   },
-  "files": ["index.js", "client.js", "cordis.patch.yml", "locale/*.json", "icon.svg", "vendor/*.mjs"],
+  "files": [
+    "index.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "vendor/*.mjs"
+  ],
   "dsh": {
-    "bundle": { "patch": "./cordis.patch.yml" },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
     "client": {
       "platform": "web",
       "immediately": true,
-      "inject": ["@deepseek-ai/dsh-client-locale", "@deepseek-ai/dsh-api-remotes"]
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ]
     }
   }
 }

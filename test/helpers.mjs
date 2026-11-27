@@ -89,6 +89,8 @@ export async function makeHost({ workspaces = [], config = {}, services = {} } =
       },
     },
     // Authentication moved to the webserver's authorize step; routes declare auth.
+    // Old DSH exposed connection.requestRejection; new DSH authenticates at the
+    // webserver instead. Tests choose which generation they emulate.
     connection: {},
     workspaceRegistry: { list: () => (typeof workspaces === 'function' ? workspaces() : workspaces) },
     subprocess: { resolveExecutable: async () => 'git' },
